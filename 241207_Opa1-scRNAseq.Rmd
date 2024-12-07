@@ -1,0 +1,299 @@
+---
+title: "BW2310 Opa1 scRNAseq d5"
+author: "Ben Willett"
+date: "11/09/23"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    code_folding: hide
+---
+
+
+##    Notes:
+- Regress out cell cycle at the beggining
+- Cluster and remove contaminates
+- Split naive and activated CD8s. Label in metadata
+- Recombine objects so I can show violin plots for naive and activated cells
+- I needed to redo the FindVariableFeatures(), scaling, etc. after I added the 'naive' and 'activated' labels to my cells
+  
+#     Install/Load packages (STEP 0)
+This section is always required.  You will load all packages necessary for the scope of the assignment in between the code blocks.  
+
+```{r, include =TRUE, echo=TRUE, message = FALSE}
+# load packages here
+library(SingleCellExperiment) #done
+library(Seurat) #done
+library(tidyverse) #done
+library(Matrix) #done
+library(scales) #done
+library(cowplot) #done
+library(RCurl) #done
+library(AnnotationHub) #done
+library(AnnotationFilter) #done
+library(AnnotationDbi) #done
+library(ensembldb) #done
+library(SeuratWrappers) #done
+library(harmony) #done
+library(ggpubr) #done
+library(gridExtra) #done
+library(metap) #done
+library(VISION) #done
+library(clusterProfiler) #done
+library(ggsci) #done
+#library(lisi) #no but I don't think I need it
+library(MetBrewer) #done
+library(wesanderson) #done
+library(scDblFinder) #done
+
+#for later pathway analysis (taken from SBT's code)
+library(readxl)
+library(org.Mm.eg.db)
+library(patchwork)
+library(writexl)
+library(fgsea)
+
+#cNMF
+library(readr)
+
+```
+
+##    Notes:
+- Regress out cell cycle at the beggining
+- Cluster and remove contaminates
+- Split naive and activated CD8s. Label in metadata
+- Recombine objects so I can show violin plots for naive and activated cells
+- I needed to redo the FindVariableFeatures(), scaling, etc. after I added the 'naive' and 'activated' labels to my cells
+  
+#     Install/Load packages (STEP 0)
+This section is always required.  You will load all packages necessary for the scope of the assignment in between the code blocks.  
+
+```{r, include =TRUE, echo=TRUE, message = FALSE}
+# load packages here
+library(SingleCellExperiment) #done
+library(Seurat) #done
+library(tidyverse) #done
+library(Matrix) #done
+library(scales) #done
+library(cowplot) #done
+library(RCurl) #done
+library(AnnotationHub) #done
+library(AnnotationFilter) #done
+library(AnnotationDbi) #done
+library(ensembldb) #done
+library(SeuratWrappers) #done
+library(harmony) #done
+library(ggpubr) #done
+library(gridExtra) #done
+library(metap) #done
+library(VISION) #done
+library(clusterProfiler) #done
+library(ggsci) #done
+#library(lisi) #no but I don't think I need it
+library(MetBrewer) #done
+library(wesanderson) #done
+library(scDblFinder) #done
+
+#for later pathway analysis (taken from SBT's code)
+library(readxl)
+library(org.Mm.eg.db)
+library(patchwork)
+library(writexl)
+library(fgsea)
+
+#cNMF
+library(readr)
+
+```
+
+<br/>
+
+#     Read in Data 
+
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+
+opa1 <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/Opa1/10X_files", unique.features = TRUE, strip.suffix = TRUE)
+
+wt <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/WT/10X_files", unique.features = TRUE, strip.suffix = TRUE)
+
+
+```
+
+
+##    Notes:
+- Regress out cell cycle at the beggining
+- Cluster and remove contaminates
+- Split naive and activated CD8s. Label in metadata
+- Recombine objects so I can show violin plots for naive and activated cells
+- I needed to redo the FindVariableFeatures(), scaling, etc. after I added the 'naive' and 'activated' labels to my cells
+  
+#     Install/Load packages (STEP 0)
+This section is always required.  You will load all packages necessary for the scope of the assignment in between the code blocks.  
+
+```{r, include =TRUE, echo=TRUE, message = FALSE}
+# load packages here
+library(SingleCellExperiment) #done
+library(Seurat) #done
+library(tidyverse) #done
+library(Matrix) #done
+library(scales) #done
+library(cowplot) #done
+library(RCurl) #done
+library(AnnotationHub) #done
+library(AnnotationFilter) #done
+library(AnnotationDbi) #done
+library(ensembldb) #done
+library(SeuratWrappers) #done
+library(harmony) #done
+library(ggpubr) #done
+library(gridExtra) #done
+library(metap) #done
+library(VISION) #done
+library(clusterProfiler) #done
+library(ggsci) #done
+#library(lisi) #no but I don't think I need it
+library(MetBrewer) #done
+library(wesanderson) #done
+library(scDblFinder) #done
+
+#for later pathway analysis (taken from SBT's code)
+library(readxl)
+library(org.Mm.eg.db)
+library(patchwork)
+library(writexl)
+library(fgsea)
+
+#cNMF
+library(readr)
+
+```
+
+<br/>
+
+#     Read in Data 
+
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+
+opa1 <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/Opa1/10X_files", unique.features = TRUE, strip.suffix = TRUE)
+
+wt <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/WT/10X_files", unique.features = TRUE, strip.suffix = TRUE)
+
+
+```
+
+#     Generate Seurat Objects
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+
+wt_obj <- CreateSeuratObject(counts = wt, project = "wt")
+opa1_obj <- CreateSeuratObject(counts = opa1, project = "opa1")
+
+
+```
+
+<br/>  
+
+
+##    Notes:
+- Regress out cell cycle at the beggining
+- Cluster and remove contaminates
+- Split naive and activated CD8s. Label in metadata
+- Recombine objects so I can show violin plots for naive and activated cells
+- I needed to redo the FindVariableFeatures(), scaling, etc. after I added the 'naive' and 'activated' labels to my cells
+  
+#     Install/Load packages (STEP 0)
+This section is always required.  You will load all packages necessary for the scope of the assignment in between the code blocks.  
+
+```{r, include =TRUE, echo=TRUE, message = FALSE}
+# load packages here
+library(SingleCellExperiment) #done
+library(Seurat) #done
+library(tidyverse) #done
+library(Matrix) #done
+library(scales) #done
+library(cowplot) #done
+library(RCurl) #done
+library(AnnotationHub) #done
+library(AnnotationFilter) #done
+library(AnnotationDbi) #done
+library(ensembldb) #done
+library(SeuratWrappers) #done
+library(harmony) #done
+library(ggpubr) #done
+library(gridExtra) #done
+library(metap) #done
+library(VISION) #done
+library(clusterProfiler) #done
+library(ggsci) #done
+#library(lisi) #no but I don't think I need it
+library(MetBrewer) #done
+library(wesanderson) #done
+library(scDblFinder) #done
+
+#for later pathway analysis (taken from SBT's code)
+library(readxl)
+library(org.Mm.eg.db)
+library(patchwork)
+library(writexl)
+library(fgsea)
+
+#cNMF
+library(readr)
+
+```
+
+<br/>
+
+#     Read in Data 
+
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+
+opa1 <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/Opa1/10X_files", unique.features = TRUE, strip.suffix = TRUE)
+
+wt <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/WT/10X_files", unique.features = TRUE, strip.suffix = TRUE)
+
+
+```
+
+#     Generate Seurat Objects
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+
+wt_obj <- CreateSeuratObject(counts = wt, project = "wt")
+opa1_obj <- CreateSeuratObject(counts = Opa1, project = "Opa1")
+
+
+```
+
+<br/>  
+
+#     Check metadata  
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+head(wt_obj@meta.data)
+tail(wt_obj@meta.data)
+
+head(opa1_obj@meta.data)
+tail(opa1_obj@meta.data)
+
+dim(wt_obj@meta.data) #7500 cells in WT sample
+dim(opa1_obj@meta.data) #6700 cells in Opa1 sample
+
+#check that row names are gene names
+row.names(wt_obj@assays$RNA@counts)
+row.names(opa1_obj@assays$RNA@counts) 
+#yep
+
+#check that col names are barcodes (cells)
+colnames(wt_obj@assays$RNA@counts) 
+colnames(opa1_obj@assays$RNA@counts)
+#yep
+```
+
+
+
