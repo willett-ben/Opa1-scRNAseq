@@ -285,15 +285,245 @@ dim(wt_obj@meta.data) #7500 cells in WT sample
 dim(opa1_obj@meta.data) #6700 cells in Opa1 sample
 
 #check that row names are gene names
-row.names(wt_obj@assays$RNA@counts)
-row.names(opa1_obj@assays$RNA@counts) 
+row.names(wt_obj@assays$RNA)
+row.names(opa1_obj@assays$RNA) 
 #yep
 
 #check that col names are barcodes (cells)
-colnames(wt_obj@assays$RNA@counts) 
-colnames(opa1_obj@assays$RNA@counts)
+colnames(wt_obj@assays$RNA) 
+colnames(opa1_obj@assays$RNA)
 #yep
 ```
+
+
+
+
+
+
+How could we tell how many reads are being considered across all cells in each sample?  
+
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+
+sum(wt_obj@meta.data$nCount_RNA)
+sum(opa1_obj@meta.data$nCount_RNA)
+
+
+```
+
+#     Add sample specific metadata
+##    Add genotype id 
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+wt_obj <- AddMetaData(wt_obj, metadata = "wt", col.name = "genotype")
+opa1_obj <- AddMetaData(opa1_obj, metadata = "opa1", col.name = "genotype")
+
+
+```
+
+Now let's check that our metadata looks good:  
+
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+head(wt_obj@meta.data)
+head(opa1_obj@meta.data)
+#genotype data added
+```
+
+#     Merge Data
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+# TO DO
+
+merged_data_object <- merge(x = wt_obj,
+                            y = opa1_obj,
+                            add.cell.id = c("wt", "opa1"))
+
+
+```
+
+
+##    Check merge success  
+It is critical that once the data has been merged, that you check the final merged data set to make sure it is what you expected.  
+<br/>  
+
+4.  Check that the object merged correctly by:  
+
+* performing a `head` on the `meta.data`  
+* performing a `tail` on the `meta.data`  
+* generating a table summary of the `orig.ident` that shows how many cells come from each sample  
+
+```{r include = TRUE, echo = TRUE}
+#TO DO
+
+head(merged_data_object@meta.data)
+tail(merged_data_object@meta.data)
+table(merged_data_object@meta.data$orig.ident)
+
+
+```
+
+
+
+
+
+
+
+#     Managing memory and space - post merge
+```{r include=TRUE, echo=TRUE}
+#TO DO
+rm(wt, wt_obj, Opa1, opa1_obj)
+gc()
+```
+
+#     Data Setup and Formatting 
+## Calculating per cell complexity and adding this to the metadata  
+```{r include = TRUE, echo = TRUE}
+# TO DO
+
+merged_data_object <- AddMetaData(object = merged_data_object,
+                                  metadata = log10(merged_data_object$nFeature_RNA)/log10(merged_data_object$nCount_RNA),col.name = "complexity")
+
+head(merged_data_object$complexity)
+
+```
+
+## Calculating mitochondrial read percentage per cell and adding this to the metadata  
+```{r include = TRUE, echo = TRUE}
+# TO DO
+
+grep(rownames(merged_data_object@assays$RNA), pattern = "mt-", value = TRUE)
+#Looks like "mt-" is the identifier for mitochondrial genes in this set
+
+#Adding mitoPct to the metadata 
+merged_data_object$mitoPct <- PercentageFeatureSet(object = merged_data_object, pattern = "mt-")
+
+head(merged_data_object$mitoPct)
+tail(merged_data_object$mitoPct)
+
+```
+
+<br/> 
+
+
+#     Initial Data Exploration 
+##    Total Cells per Sample  
+```{r include = TRUE, echo = TRUE}
+# TO DO
+
+ggplot(merged_data_object@meta.data, aes(x=orig.ident, fill=orig.ident)) +
+geom_bar() +
+theme_classic() +
+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+theme(plot.title = element_text(hjust=0.5, face="bold")) +
+ggtitle("Number of Cells Per Sample (raw)")
+
+
+```
+
+<br/>  
+
+##    Distribution of total number of reads per cell  
+```{r include = TRUE, echo = TRUE}
+# TO DO
+
+ggplot(merged_data_object@meta.data, aes(color=orig.ident, x=nCount_RNA, fill= orig.ident)) +
+geom_density(alpha = 0.2) +
+scale_x_log10() +
+theme_classic() +
+ylab("Cell density") +
+ggtitle("Distribution of reads per cell across samples")
+
+
+```
+
+<br/>  
+
+##    Distribution of total number of unique genes expressed per cell  
+```{r include = TRUE, echo = TRUE}
+# TO DO
+
+#similar code, just changing out the metadata column that we are graphing
+ggplot(merged_data_object@meta.data, aes(color=orig.ident, x=nFeature_RNA, fill= orig.ident)) +
+ geom_density(alpha = 0.2) +
+ theme_classic() +
+ scale_x_log10() +
+ggtitle("Distribution of total unique genes per cell across samples")
+
+# TO DO -- THE BOXPLOT VERSION
+
+ggplot(merged_data_object@meta.data, aes(x=orig.ident, y=log10(nFeature_RNA), fill=orig.ident)) +
+geom_boxplot() +
+theme_classic() +
+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+theme(plot.title = element_text(hjust=0.5, face="bold")) +
+ggtitle("Distribution of unique genes expressed per cell (raw)")
+
+
+```
+
+<br/>  
+
+##    Joint plot of reads, genes, and mitochondrial percentage  
+```{r include = TRUE, echo = FALSE, message = FALSE, warning=FALSE}
+# TO DO 
+
+#
+
+ggplot(merged_data_object@meta.data, aes(x=nCount_RNA, y=nFeature_RNA, color=mitoPct)) +
+   geom_point() +
+   scale_colour_gradient(low = "gray90", high = "black") +
+   stat_smooth(method=lm) + #throws in linear model line (blue line)
+   scale_x_log10() +
+   scale_y_log10() +
+   theme_classic() +
+   facet_wrap(~orig.ident)
+
+```
+
+<br/>  
+
+##    Distribution of mitochondrial percent per cell  
+```{r include=TRUE, echo=TRUE, warning = FALSE}
+# TO DO
+
+ggplot(merged_data_object@meta.data, aes(color=orig.ident, x=mitoPct, fill=orig.ident)) +
+geom_density(alpha = 0.2) +
+scale_x_log10() +
+theme_classic()+
+ggtitle("Distribution of mitochondrial contamination per cell across samples")
+
+#Expected that the Opa1ko have even less mito chontamination than normal because the MITOCHONDRIAL GENOME IS NOT MAINTAINED in Opa1ko cells!!
+```
+
+<br/>  
+
+##    Distribution of library complexity per cell
+```{r include=TRUE, echo=TRUE}
+# TO DO
+
+
+ggplot(merged_data_object@meta.data, aes(x=complexity, color = orig.ident, fill=orig.ident)) +
+        geom_density(alpha = 0.2) +
+        theme_classic() + 
+  ggtitle("Distribution of complexity across samples")
+
+```
+
+##    Other plots  
+```{r include=TRUE, echo=TRUE}
+# TO DO
+
+VlnPlot(merged_data_object, features = c("nFeature_RNA", "nCount_RNA", "mitoPct"), ncol = 3)
+VlnPlot(merged_data_object, features = c("nFeature_RNA", "nCount_RNA", "mitoPct"), stack = T)
+
+```
+
+
+
+
+
+
+
 
 
 
