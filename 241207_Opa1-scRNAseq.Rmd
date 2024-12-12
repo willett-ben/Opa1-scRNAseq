@@ -338,6 +338,7 @@ merged_data_object <- merge(x = wt_obj,
                             y = opa1_obj,
                             add.cell.id = c("wt", "opa1"))
 
+merged_data_object <- JoinLayers(merged_data_object)
 
 ```
 
@@ -363,15 +364,10 @@ table(merged_data_object@meta.data$orig.ident)
 ```
 
 
-
-
-
-
-
 #     Managing memory and space - post merge
 ```{r include=TRUE, echo=TRUE}
 #TO DO
-rm(wt, wt_obj, Opa1, opa1_obj)
+rm(wt, wt_obj, opa1, opa1_obj)
 gc()
 ```
 
@@ -384,7 +380,7 @@ merged_data_object <- AddMetaData(object = merged_data_object,
                                   metadata = log10(merged_data_object$nFeature_RNA)/log10(merged_data_object$nCount_RNA),col.name = "complexity")
 
 head(merged_data_object$complexity)
-
+tail(merged_data_object$complexity)
 ```
 
 ## Calculating mitochondrial read percentage per cell and adding this to the metadata  
@@ -521,6 +517,205 @@ VlnPlot(merged_data_object, features = c("nFeature_RNA", "nCount_RNA", "mitoPct"
 
 
 
+
+
+
+
+#     Filtering 
+##    Cell-Level filtering
+
+* keep cells with at least 200 unique genes present per cell  
+* keep cells with at 1000 reads present per cell  
+* keep cells that have a mitochondrial contamination percent of less than 20%  
+* keep cell with a complexity of greater than 80%  
+
+
+```{r include = TRUE, echo = TRUE}
+# TO DO  
+
+filtered_data_object <- subset(x = merged_data_object,
+                               subset = 
+                                 (nFeature_RNA >= 2000) &
+                                 (nCount_RNA >= 8500) &
+                                 (mitoPct < 10) &
+                                 (complexity > 0.75))
+```
+
+* The total number of cells before filtering  
+* The total number of cell after filtering  
+
+```{r include = TRUE, echo = TRUE}
+# TO DO  
+
+#this pulls the counts from the RNA object in the Seurat object
+paste("The number of cells prior to filtering:")
+dim(merged_data_object@meta.data)[1]
+
+paste("The number of cells after filtering:")
+dim(filtered_data_object@meta.data)[1]
+
+
+```
+
+##    Gene-Level filtering  
+
+Remove the following genes:
+* that have 0 counts across all cells  
+* not present in at least 10 cells  
+
+```{r include = TRUE, echo = TRUE}
+# TO DO
+
+#count variable:
+#row names = gene
+#col names = cells
+
+counts <- LayerData(filtered_data_object, assay = "RNA", layer = "counts")
+
+
+
+nonzero <- counts > 0
+nonzero
+
+#filter out everything with less than 10 reads across all cells
+less_10 <- Matrix::rowSums(nonzero) >= 10
+less_10_matrix <- counts[less_10,]
+dim(less_10_matrix)
+head(less_10_matrix)
+
+
+#Going to use 10 as a cutoff for now
+keep_genes <- Matrix::rowSums(nonzero) >= 10
+filtered_counts <- counts[keep_genes, ]
+head(filtered_counts)
+#rows = genes
+#cols = barcodes
+
+#32285 genes prior to filtering
+dim(filtered_data_object@assays$RNA@features)
+
+#13752 genes have been removed via this filtering
+#less_10_matrix is the genes that remain after filtering. so ~18k genes remain after filtering
+print(dim(filtered_data_object@assays$RNA@features)[1] - dim(less_10_matrix)[1])
+
+
+
+
+filtered_data_object <- CreateSeuratObject(counts = filtered_counts, meta.data = filtered_data_object@meta.data)
+```
+
+
+#     Post-Filtering Data Exploration  
+##    Total Cells per Sample  
+```{r include = TRUE, echo = TRUE}
+# TO DO
+
+ggplot(filtered_data_object@meta.data, aes(x=orig.ident, fill=orig.ident)) +
+geom_bar() +
+theme_classic() +
+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+theme(plot.title = element_text(hjust=0.5, face="bold"))
+
+
+```
+<br/>  
+##    Distribution of total number of reads per cell  
+
+```{r include = TRUE, echo = TRUE}
+# TO DO
+
+ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nCount_RNA, fill= orig.ident)) +
+  geom_density(alpha = 0.2) +
+  scale_x_log10() +
+  theme_classic() +
+  ylab("Cell density") +
+  geom_vline(xintercept = 1000, linetype = "dashed", color = "orange", linewidth = 2)
+
+
+
+```
+##    Distribution of total number of unique genes expressed per cell  
+
+```{r include = TRUE, echo = TRUE, warning=FALSE}
+# TO DO
+
+ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nFeature_RNA, fill= orig.ident)) +
+  geom_density(alpha = 0.2) +
+  scale_x_log10() +
+  theme_classic() +
+  ylab("Cell density")
+
+
+```
+
+<br/>  
+
+##    Joint plot of reads, genes, and mitochondrial percentage  
+
+```{r include = TRUE, echo = TRUE, warning=FALSE, message=FALSE}
+# TO DO
+
+ggplot(filtered_data_object@meta.data, aes(x=nCount_RNA, y=nFeature_RNA, color=mitoPct)) +
+   geom_point() +
+   scale_colour_gradient(low = "gray90", high = "black") +
+   stat_smooth(method=lm) + #throws in linear model line (blue line)
+   scale_x_log10() +
+   scale_y_log10() +
+   theme_classic() +
+   facet_wrap(~orig.ident)
+
+```
+
+##    Distribution of mitochondrial percent per cell  
+
+```{r include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# TO DO
+
+ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=mitoPct, fill=orig.ident)) +
+geom_density(alpha = 0.2) +
+scale_x_log10() +
+theme_classic() +
+geom_vline(xintercept = 20, linetype = "dashed", color = "orange", linewidth = 2)
+
+
+```
+
+##    Distribution of library complexity per cell  
+
+```{r include=TRUE, echo=TRUE}
+# TO DO
+
+ggplot(filtered_data_object@meta.data, aes(x=complexity, color=orig.ident, fill=orig.ident)) +
+        geom_density(alpha = 0.2) +
+theme_classic()
+
+```
+
+<br/>  
+
+##    Other plots  
+
+```{r include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+# TO DO
+
+VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPct"), ncol = 3)
+VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPct"), stack = T)
+
+```
+
+
+##    Managing memory and space  .   
+
+```{r include=TRUE, echo=TRUE}
+# TO DO
+#going to keep the merged_data_object in case I need to go back and refilter things
+rm(nonzero, keep_genes, counts, filtered_counts, less_10_matrix, less_10)
+gc()
+
+
+```
+
+<br/>  
 
 
 
