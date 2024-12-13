@@ -60,192 +60,6 @@ library(readr)
 
 ```
 
-##    Notes:
-- Regress out cell cycle at the beggining
-- Cluster and remove contaminates
-- Split naive and activated CD8s. Label in metadata
-- Recombine objects so I can show violin plots for naive and activated cells
-- I needed to redo the FindVariableFeatures(), scaling, etc. after I added the 'naive' and 'activated' labels to my cells
-  
-#     Install/Load packages (STEP 0)
-This section is always required.  You will load all packages necessary for the scope of the assignment in between the code blocks.  
-
-```{r, include =TRUE, echo=TRUE, message = FALSE}
-# load packages here
-library(SingleCellExperiment) #done
-library(Seurat) #done
-library(tidyverse) #done
-library(Matrix) #done
-library(scales) #done
-library(cowplot) #done
-library(RCurl) #done
-library(AnnotationHub) #done
-library(AnnotationFilter) #done
-library(AnnotationDbi) #done
-library(ensembldb) #done
-library(SeuratWrappers) #done
-library(harmony) #done
-library(ggpubr) #done
-library(gridExtra) #done
-library(metap) #done
-library(VISION) #done
-library(clusterProfiler) #done
-library(ggsci) #done
-#library(lisi) #no but I don't think I need it
-library(MetBrewer) #done
-library(wesanderson) #done
-library(scDblFinder) #done
-
-#for later pathway analysis (taken from SBT's code)
-library(readxl)
-library(org.Mm.eg.db)
-library(patchwork)
-library(writexl)
-library(fgsea)
-
-#cNMF
-library(readr)
-
-```
-
-<br/>
-
-#     Read in Data 
-
-```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
-# TO DO
-
-opa1 <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/Opa1/10X_files", unique.features = TRUE, strip.suffix = TRUE)
-
-wt <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/WT/10X_files", unique.features = TRUE, strip.suffix = TRUE)
-
-
-```
-
-
-##    Notes:
-- Regress out cell cycle at the beggining
-- Cluster and remove contaminates
-- Split naive and activated CD8s. Label in metadata
-- Recombine objects so I can show violin plots for naive and activated cells
-- I needed to redo the FindVariableFeatures(), scaling, etc. after I added the 'naive' and 'activated' labels to my cells
-  
-#     Install/Load packages (STEP 0)
-This section is always required.  You will load all packages necessary for the scope of the assignment in between the code blocks.  
-
-```{r, include =TRUE, echo=TRUE, message = FALSE}
-# load packages here
-library(SingleCellExperiment) #done
-library(Seurat) #done
-library(tidyverse) #done
-library(Matrix) #done
-library(scales) #done
-library(cowplot) #done
-library(RCurl) #done
-library(AnnotationHub) #done
-library(AnnotationFilter) #done
-library(AnnotationDbi) #done
-library(ensembldb) #done
-library(SeuratWrappers) #done
-library(harmony) #done
-library(ggpubr) #done
-library(gridExtra) #done
-library(metap) #done
-library(VISION) #done
-library(clusterProfiler) #done
-library(ggsci) #done
-#library(lisi) #no but I don't think I need it
-library(MetBrewer) #done
-library(wesanderson) #done
-library(scDblFinder) #done
-
-#for later pathway analysis (taken from SBT's code)
-library(readxl)
-library(org.Mm.eg.db)
-library(patchwork)
-library(writexl)
-library(fgsea)
-
-#cNMF
-library(readr)
-
-```
-
-<br/>
-
-#     Read in Data 
-
-```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
-# TO DO
-
-opa1 <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/Opa1/10X_files", unique.features = TRUE, strip.suffix = TRUE)
-
-wt <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/WT/10X_files", unique.features = TRUE, strip.suffix = TRUE)
-
-
-```
-
-#     Generate Seurat Objects
-```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
-# TO DO
-
-wt_obj <- CreateSeuratObject(counts = wt, project = "wt")
-opa1_obj <- CreateSeuratObject(counts = opa1, project = "opa1")
-
-
-```
-
-<br/>  
-
-
-##    Notes:
-- Regress out cell cycle at the beggining
-- Cluster and remove contaminates
-- Split naive and activated CD8s. Label in metadata
-- Recombine objects so I can show violin plots for naive and activated cells
-- I needed to redo the FindVariableFeatures(), scaling, etc. after I added the 'naive' and 'activated' labels to my cells
-  
-#     Install/Load packages (STEP 0)
-This section is always required.  You will load all packages necessary for the scope of the assignment in between the code blocks.  
-
-```{r, include =TRUE, echo=TRUE, message = FALSE}
-# load packages here
-library(SingleCellExperiment) #done
-library(Seurat) #done
-library(tidyverse) #done
-library(Matrix) #done
-library(scales) #done
-library(cowplot) #done
-library(RCurl) #done
-library(AnnotationHub) #done
-library(AnnotationFilter) #done
-library(AnnotationDbi) #done
-library(ensembldb) #done
-library(SeuratWrappers) #done
-library(harmony) #done
-library(ggpubr) #done
-library(gridExtra) #done
-library(metap) #done
-library(VISION) #done
-library(clusterProfiler) #done
-library(ggsci) #done
-#library(lisi) #no but I don't think I need it
-library(MetBrewer) #done
-library(wesanderson) #done
-library(scDblFinder) #done
-
-#for later pathway analysis (taken from SBT's code)
-library(readxl)
-library(org.Mm.eg.db)
-library(patchwork)
-library(writexl)
-library(fgsea)
-
-#cNMF
-library(readr)
-
-```
-
 <br/>
 
 #     Read in Data 
@@ -564,15 +378,12 @@ Remove the following genes:
 * not present in at least 10 cells  
 
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 #count variable:
 #row names = gene
 #col names = cells
 
 counts <- LayerData(filtered_data_object, assay = "RNA", layer = "counts")
-
-
 
 nonzero <- counts > 0
 nonzero
@@ -584,7 +395,7 @@ dim(less_10_matrix)
 head(less_10_matrix)
 
 
-#Going to use 10 as a cutoff for now
+#Using 10 as cutoff
 keep_genes <- Matrix::rowSums(nonzero) >= 10
 filtered_counts <- counts[keep_genes, ]
 head(filtered_counts)
@@ -599,8 +410,6 @@ dim(filtered_data_object@assays$RNA@features)
 print(dim(filtered_data_object@assays$RNA@features)[1] - dim(less_10_matrix)[1])
 
 
-
-
 filtered_data_object <- CreateSeuratObject(counts = filtered_counts, meta.data = filtered_data_object@meta.data)
 ```
 
@@ -608,7 +417,6 @@ filtered_data_object <- CreateSeuratObject(counts = filtered_counts, meta.data =
 #     Post-Filtering Data Exploration  
 ##    Total Cells per Sample  
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 ggplot(filtered_data_object@meta.data, aes(x=orig.ident, fill=orig.ident)) +
 geom_bar() +
@@ -616,13 +424,11 @@ theme_classic() +
 theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
 theme(plot.title = element_text(hjust=0.5, face="bold"))
 
-
 ```
 <br/>  
 ##    Distribution of total number of reads per cell  
 
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nCount_RNA, fill= orig.ident)) +
   geom_density(alpha = 0.2) +
@@ -631,13 +437,10 @@ ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nCount_RNA, fill=
   ylab("Cell density") +
   geom_vline(xintercept = 1000, linetype = "dashed", color = "orange", linewidth = 2)
 
-
-
 ```
 ##    Distribution of total number of unique genes expressed per cell  
 
 ```{r include = TRUE, echo = TRUE, warning=FALSE}
-# TO DO
 
 ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nFeature_RNA, fill= orig.ident)) +
   geom_density(alpha = 0.2) +
@@ -653,7 +456,6 @@ ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nFeature_RNA, fil
 ##    Joint plot of reads, genes, and mitochondrial percentage  
 
 ```{r include = TRUE, echo = TRUE, warning=FALSE, message=FALSE}
-# TO DO
 
 ggplot(filtered_data_object@meta.data, aes(x=nCount_RNA, y=nFeature_RNA, color=mitoPct)) +
    geom_point() +
@@ -669,7 +471,6 @@ ggplot(filtered_data_object@meta.data, aes(x=nCount_RNA, y=nFeature_RNA, color=m
 ##    Distribution of mitochondrial percent per cell  
 
 ```{r include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
-# TO DO
 
 ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=mitoPct, fill=orig.ident)) +
 geom_density(alpha = 0.2) +
@@ -677,13 +478,11 @@ scale_x_log10() +
 theme_classic() +
 geom_vline(xintercept = 20, linetype = "dashed", color = "orange", linewidth = 2)
 
-
 ```
 
 ##    Distribution of library complexity per cell  
 
 ```{r include=TRUE, echo=TRUE}
-# TO DO
 
 ggplot(filtered_data_object@meta.data, aes(x=complexity, color=orig.ident, fill=orig.ident)) +
         geom_density(alpha = 0.2) +
@@ -696,7 +495,6 @@ theme_classic()
 ##    Other plots  
 
 ```{r include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
-# TO DO
 
 VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPct"), ncol = 3)
 VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPct"), stack = T)
@@ -707,7 +505,7 @@ VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPc
 ##    Managing memory and space  .   
 
 ```{r include=TRUE, echo=TRUE}
-# TO DO
+
 #going to keep the merged_data_object in case I need to go back and refilter things
 rm(nonzero, keep_genes, counts, filtered_counts, less_10_matrix, less_10)
 gc()
@@ -717,16 +515,12 @@ gc()
 
 <br/>  
 
-
-
-
 #     Normalization and gene score calculations   
 Now that we have visually identified some cell-level thresholds  
 
 ## Gene expression normalization  
 
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 filtered_data_object <- NormalizeData(object = filtered_data_object,
                                       normalization.method = "LogNormalize",
@@ -744,7 +538,6 @@ merged_data_object@assays$RNA@layers
 ## Calculate cell cycling scores    
 
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 #this provides a list of agreed upon list of genes for cycling cells
 cc.genes.updated.2019
@@ -757,7 +550,6 @@ filtered_data_object <- CellCycleScoring(object = filtered_data_object,
 head(filtered_data_object@meta.data)
 
 ```
-
 
 Generate a bar graph where the x-axis is Phase to illustrate distribution of cells per phase.    
 
@@ -784,7 +576,7 @@ theme(plot.title = element_text(hjust=0.5, face="bold"))
 Use 2000 most variable genes:
 
 ```{r include = TRUE, echo=TRUE}
-# TO DO
+
 #2000 genes is a good starting point, no real need to use 5k or more
 #FindVariableFeatures knows to use the normalized data. Back end Seurat stuff going on here, don't really need to worry about that
 filtered_data_object <- FindVariableFeatures(object = filtered_data_object,
@@ -834,7 +626,6 @@ filtered_data_object <- ScaleData(object = filtered_data_object,
 ##    Calculate principle components 
 
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 filtered_data_object <- RunPCA(object = filtered_data_object,
                                assay = "RNA",
@@ -854,7 +645,7 @@ filtered_data_object <- RunPCA(object = filtered_data_object,
 * orig.ident  
 
 ```{r include=TRUE, echo=TRUE}
-# TO DO
+
 DimPlot(filtered_data_object, reduction = "pca", group.by = "Phase", order = TRUE)
 DimPlot(filtered_data_object, reduction = "pca", split.by = "Phase", order = TRUE)
 DimPlot(filtered_data_object, reduction = "pca", group.by = "orig.ident", order = TRUE)
@@ -867,7 +658,6 @@ DimPlot(filtered_data_object, reduction = "pca", group.by = "Phase", split.by = 
 *  mitchondrial percentage
 
 ```{r include=TRUE, echo=TRUE}
-# TO DO
 
 FeaturePlot(object = filtered_data_object,
             reduction = "pca",
@@ -891,19 +681,15 @@ DimHeatmap(object = filtered_data_object,
 Using 20
 
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 ElbowPlot(object = filtered_data_object, ndims = 50, reduction = "pca")
 pcs = 20
-
-
 
 ```
 
 ###   *t*-SNE  
 
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 filtered_data_object <- RunTSNE(object = filtered_data_object,
                                 dims = 1:pcs,
@@ -915,7 +701,6 @@ filtered_data_object <- RunTSNE(object = filtered_data_object,
 DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_tsne", group.by = "orig.ident")
 
 DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_tsne", group.by = "Phase")
-
 
 ```
 
@@ -941,10 +726,9 @@ DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_umap", g
 #     Clustering 
 
 ## Find cell neighbors
-  --> Uses pcs variable
+  --> Uses pcs variable defined earlier
 
 ```{r include=TRUE, echo=TRUE}
-# TO DO
 
 filtered_data_object <- FindNeighbors(object = filtered_data_object,
                                       reduction = "pca",
@@ -956,7 +740,6 @@ filtered_data_object <- FindNeighbors(object = filtered_data_object,
 ## Cluster cells based on neighborhood
 
 ```{r inclue = TRUE, echo = TRUE}
-# TO DO 
 
 #for resolution, pick a few to start with and refine from there.
 filtered_data_object <- FindClusters(object = filtered_data_object,
@@ -1083,9 +866,9 @@ Wanted to try it for the sake of practice but ran into issues installing lisi li
 
 ##Feature plots
 
-* nCount_RNA  
-* nFeature_RNA  
-* mitoPct  
+* nCount_RNA  (reads)
+* nFeature_RNA  (genes)
+* mitoPct  (percent mito genes)
 
 ```{r include = TRUE, echo = TRUE}
 
@@ -1119,7 +902,7 @@ FeaturePlot(object = filtered_data_object,
 
 ```{r include = TRUE, echo = TRUE}
 
-VlnPlot(filtered_data_object, features = c("Cd19","Ms4a1","Hba-a1", "H2-Ab1","Ncr1","mt-Nd1","Cd3e","Cd8a","Spi1", "Cd4", "Cd24a", "Eomes", "Ikzf2", "Cd163l1","Igf1r","St6galnac3", "Itgal", "Itgam", "Fcgr3a"),group.by = "seurat_clusters", combine = FALSE)
+VlnPlot(filtered_data_object, features = c("Cd19","Ms4a1","Hba-a1", "H2-Ab1","Ncr1","Cd3e","Cd8a","Spi1", "Cd4", "Cd24a", "Ikzf2", "Cd163l1","Igf1r","St6galnac3", "Itgal", "Itgam", "Fcgr3a"),group.by = "seurat_clusters", combine = FALSE)
 
 
 ``` 
@@ -1146,6 +929,9 @@ Idents(filtered_data_object) <- "scDblFinder.class"
 filtered_data_object <- subset(x = filtered_data_object, idents = "singlet")
 
 #doublet have been removed - yes, this is the same code as above
+table(filtered_data_object@meta.data$scDblFinder.class,
+      filtered_data_object@meta.data$scDblFinder.sample)
+
 DimPlot(object = filtered_data_object, reduction = "initial_umap",
        group.by = "scDblFinder.class", split.by = "orig.ident", order = TRUE)
 ```
@@ -1160,20 +946,12 @@ Tcell_data_object <- filtered_data_object %>% subset(seurat_clusters %in% c("0",
 table(Tcell_data_object@meta.data$RNA_snn_res.0.15, Tcell_data_object@meta.data$orig.ident)
 table(Tcell_data_object@meta.data$Phase, Tcell_data_object@meta.data$genotype)
 
-VlnPlot(Tcell_data_object, features = c("Cd19","Ms4a1","Hba-a1", "H2-Ab1","Ncr1","mt-Nd1","Cd3e","Cd8a","Spi1", "Cd4", "Cd24a", "Eomes", "Ikzf2", "Cd163l1","Igf1r","St6galnac3"),group.by = "seurat_clusters", combine = FALSE)
-
 #Ok. Non-Tcell clusters have been removed. 
 
 ```
-## 2nd round of clustering. Do we need to remove anything else?
-  * I had fetal derived CD8s in past analyses. This is to double check.
-  
-  Notes: We have removed non-T cell contaminates
-  pcs = 20
 
 ##    ReRun t-SNE, UMAP, and clustering for Tcell only data
-###   Decide how many PCs to use.
-      Using 20
+###   PCs - still 20
 ```{r include = TRUE, echo = TRUE}
 
 ElbowPlot(object = Tcell_data_object, ndims = 50, reduction = "pca")
@@ -1227,11 +1005,11 @@ DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.
 
 ##    Re-Clustering
 
-###   Resolution using = 0.1
+###   Resolution using = 0.05 (241213)
 
 ```{r include = TRUE, echo = TRUE}
 Tcell_data_object <- FindClusters(object = Tcell_data_object,
-                                     resolution = 0.1,
+                                     resolution = 0.05,
                                      algorithm = 1,
                                      random.seed = 18)
 
@@ -1240,17 +1018,17 @@ DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
         label = FALSE,
         label.size = 6,
-        group.by = "RNA_snn_res.0.1",
+        group.by = "RNA_snn_res.0.05",
         split.by = "orig.ident") +
-        ggtitle("Resolution = 0.1")
+        ggtitle("Resolution = 0.05")
 
 DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
         label = FALSE,
         label.size = 6,
-        group.by = "RNA_snn_res.0.1",
+        group.by = "RNA_snn_res.0.05",
         split.by = "Phase") +
-        ggtitle("Resolution = 0.1")
+        ggtitle("Resolution = 0.05")
 
 DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
@@ -1258,12 +1036,12 @@ DimPlot(object = Tcell_data_object,
         label.size = 6,
         group.by = "orig.ident",
         split.by = "Phase") +
-        ggtitle("Resolution = 0.1")
+        ggtitle("Resolution = 0.05")
 
 # Get number of cells per cluster and per sample of origin
-table(Tcell_data_object@meta.data$RNA_snn_res.0.1, Tcell_data_object@meta.data$orig.ident)
+table(Tcell_data_object@meta.data$RNA_snn_res.0.05, Tcell_data_object@meta.data$orig.ident)
 
-Idents(object = Tcell_data_object) <- "RNA_snn_res.0.1"
+Idents(object = Tcell_data_object) <- "RNA_snn_res.0.05"
 ```
 
 ###   Other resolutions tested
@@ -1287,7 +1065,7 @@ DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
         label = FALSE,
         label.size = 6,
-        group.by = "RNA_snn_res.0.1",
+        group.by = "RNA_snn_res.0.05",
         split.by = "orig.ident") +
         ggtitle("Resolution = 0.1")
 
@@ -1321,9 +1099,9 @@ DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
         label = FALSE,
         label.size = 6,
-        group.by = "RNA_snn_res.0.1",
+        group.by = "RNA_snn_res.0.05",
         split.by = "orig.ident") +
-        ggtitle("Resolution = 0.1")
+        ggtitle("Resolution = 0.05")
 
 DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
@@ -1332,17 +1110,12 @@ DimPlot(object = Tcell_data_object,
         split.by = "orig.ident", cols = c("gray", "orange", "#009E73")) + 
         theme(strip.text.x = element_text(size = 20, face = "bold") ) +
         ggtitle("") + xlab("Tcell UMAP 1") + ylab("Tcell UMAP 2")
-        
-
 
 ```
 
 
-
-
-
 #     T Cell cluster wrangling
-          Resolution = 0.1
+          Resolution = 0.05 (This has been 0.1 before. Looking for 4 total clusters: naive and 3 activated. 2 G1 clusters, 2                    dividing)
 ##   Identify Naive T cell cluster based on Lef1 and Tcf7 expression.
 ```{r include = TRUE, echo = TRUE}
 
@@ -1360,7 +1133,8 @@ FeaturePlot(object = Tcell_data_object,
 
 ```
 
-##   Label cells as Naive and activated. Made new seurat objects to do this (probably an easier way?). Recombined and replaced           Tcell_data_object
+##    Label cells as Naive and activated. Made new seurat objects to do this (probably an easier way?). Recombined and replaced           Tcell_data_object
+      Can save Naive and activated groups of cells as RDS files, if wanted for some type of analysis that way.
 
 ```{r include = TRUE, echo = TRUE}
 DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
@@ -1386,10 +1160,14 @@ Activated_data_object <- AddMetaData(Activated_data_object, metadata = "activate
 Tcell_data_object <- merge(x = Naive_data_object,
                            y = Activated_data_object)
 
+Tcell_data_object <- JoinLayers(Tcell_data_object)
+
 DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
 table(Tcell_data_object@meta.data$activation_status, Tcell_data_object@meta.data$orig.ident)
 table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$orig.ident)
 table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$activation_status)
+
+
 ```
 
 ##    Clean up metadata - remove unused columns
@@ -1423,7 +1201,7 @@ Tcell_data_object
 
 ```
 
-##     Redo PCAs 
+##     Redo PCAs for Tcell_data_object 
 ```{r include = TRUE, echo=TRUE}
 # TO DO
 #2000 genes is a good starting point, no real need to use 5k or more
@@ -1461,6 +1239,7 @@ ggplot(variableGeneDf, aes(x = log(mean),
 
 
 ###    Scale the data 
+          This may not be needed? since it was scaled earlier?
           *Regress out cell cycle
 
 ```{r include = TRUE, echo = TRUE}
@@ -1625,16 +1404,36 @@ levels(Tcell_data_object@active.ident) <- as.factor(cluster_names)
 
 
 
-##    Removing the two WT cells in the opa1_unique cluster
+##    Removing the WT cells in the opa1_unique cluster (has popped up before. Not needed 241213)
 ```{r include = TRUE, echo = TRUE}
 
 #found the wt cell in this clusters: "wt_TGTTACTTCACAATGC"
 head(WhichCells(Tcell_data_object, ident = "d5_opa1_unique"), 10)
-toRemove <- "wt_TGTTACTTCACAATGC"
+#toRemove <- "wt_TGTTACTTCACAATGC"
 
 #wt cell has been removed
-Tcell_data_object <- Tcell_data_object[, !colnames(Tcell_data_object) %in% toRemove]
+#Tcell_data_object <- Tcell_data_object[, !colnames(Tcell_data_object) %in% toRemove]
 table(Tcell_data_object@meta.data$RNA_snn_res.0.1, Tcell_data_object@meta.data$orig.ident)
+
+```
+
+
+
+
+
+
+
+
+#    Managing memory and space
+
+```{r include=TRUE, echo=TRUE}
+
+#Removing merged and filtered data objects - we've gotten to a good spot with our clusters and groups
+#Removing Activated and Naive data objects - those can be rederived, if wanted.
+#Don't need the dublets ID data
+rm(Activated_data_object, Naive_data_object, filtered_data_object, merged_data_object, scDblObj, cluster_names)
+gc()
+
 
 ```
 
