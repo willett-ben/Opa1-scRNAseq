@@ -1439,7 +1439,12 @@ gc()
 
 Putting in some change here. Can I add this to the 'initial analysis branch'?
 
+```{r include=TRUE, echo=TRUE}
 
+Trying to figure out commits with branches and then merging it with main
+
+
+```
 
 
 
