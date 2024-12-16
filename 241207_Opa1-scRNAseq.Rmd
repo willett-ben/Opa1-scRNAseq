@@ -1209,28 +1209,55 @@ Tcell_data_object
 
 ```
 
+##    Renaming T cell clusters (4 of them)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-delete down below??? - have not renamed the clusters yet!
-
-
-#    Removing the WT cells in the opa1_unique cluster (has popped up before. Not needed 241213)
 ```{r include = TRUE, echo = TRUE}
 
+DimPlot(object = Tcell_data_object,
+        reduction = "Tcell_umap",
+        label = FALSE,
+        label.size = 6,
+        group.by = "RNA_snn_res.0.075",
+        split.by = "orig.ident") +
+        ggtitle("Resolution = 0.075")
+
+#Cluster 0 = naive
+FeaturePlot(object = Tcell_data_object,
+            reduction = "Tcell_umap",
+            features = "Lef1",
+            split.by = "orig.ident",
+            order = FALSE) + theme(legend.position = c(0.8,0.9))
+
+#cluster 1 = d5 dividing (both wt and opa1)
+#cluster 2 = d5 G1
+#cluster 3 = d5 opa1 unique
+DimPlot(object = Tcell_data_object,
+        reduction = "Tcell_umap",
+        label = FALSE,
+        label.size = 6,
+        group.by = "Phase",
+        split.by = "orig.ident") +
+        ggtitle("Resolution = 0.075")
+
+
+cluster_names <- c("Naive","d5_dividing", "d5_G1","d5_opa1_unique")
+
+#This will rename the factors in seurat_clusters to the names I put in the list from the last command
+levels(Tcell_data_object@meta.data$seurat_clusters) <- as.factor(cluster_names)
+levels(Tcell_data_object@meta.data$seurat_clusters)
+
+#Active ident set to the new set of cluster names too
+levels(Tcell_data_object@active.ident) <- as.factor(cluster_names)
+```
+
+#   Removing the WT cells in the opa1_unique cluster (has popped up before. Not needed 241213)
+    Would need to rework this. Think something changed between Seurat v4 and v5  
+```{r include = TRUE, echo = TRUE}
+
+#need to rework this. Think this code
 #found the wt cell in this clusters: "wt_TGTTACTTCACAATGC"
-head(WhichCells(Tcell_data_object, ident = "d5_opa1_unique"), 10)
+#WhichCells(Tcell_data_object, idents = "Naive")
+#WhichCells(Tcell_data_object, iden)
 #toRemove <- "wt_TGTTACTTCACAATGC"
 
 #wt cell has been removed
@@ -1238,13 +1265,6 @@ head(WhichCells(Tcell_data_object, ident = "d5_opa1_unique"), 10)
 table(Tcell_data_object@meta.data$RNA_snn_res.0.075, Tcell_data_object@meta.data$orig.ident)
 
 ```
-
-
-
-
-
-
-
 
 #    Managing memory and space
 
