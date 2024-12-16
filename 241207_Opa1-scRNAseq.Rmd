@@ -67,9 +67,9 @@ library(readr)
 ```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
 # TO DO
 
-opa1 <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/Opa1/10X_files", unique.features = TRUE, strip.suffix = TRUE)
+opa1 <- Read10X(data.dir = "~/Documents/Sandbox/Opa1-scRNAseq/10X_data/Opa1/10X_files", unique.features = TRUE, strip.suffix = TRUE)
 
-wt <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/WT/10X_files", unique.features = TRUE, strip.suffix = TRUE)
+wt <- Read10X(data.dir = "~/Documents/Sandbox/Opa1-scRNAseq/10X_data/WT/10X_files", unique.features = TRUE, strip.suffix = TRUE)
 
 
 ```
@@ -79,7 +79,7 @@ wt <- Read10X(data.dir = "~/Desktop/Opa1_scRNAseq/WT/10X_files", unique.features
 # TO DO
 
 wt_obj <- CreateSeuratObject(counts = wt, project = "wt")
-opa1_obj <- CreateSeuratObject(counts = Opa1, project = "Opa1")
+opa1_obj <- CreateSeuratObject(counts = opa1, project = "opa1")
 
 
 ```
@@ -88,7 +88,7 @@ opa1_obj <- CreateSeuratObject(counts = Opa1, project = "Opa1")
 
 #     Check metadata  
 ```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
-# TO DO
+
 head(wt_obj@meta.data)
 tail(wt_obj@meta.data)
 
@@ -99,25 +99,19 @@ dim(wt_obj@meta.data) #7500 cells in WT sample
 dim(opa1_obj@meta.data) #6700 cells in Opa1 sample
 
 #check that row names are gene names
-row.names(wt_obj@assays$RNA)
-row.names(opa1_obj@assays$RNA) 
-#yep
+head(row.names(wt_obj@assays$RNA))
+head(row.names(opa1_obj@assays$RNA))
+
 
 #check that col names are barcodes (cells)
-colnames(wt_obj@assays$RNA) 
-colnames(opa1_obj@assays$RNA)
-#yep
+head(colnames(wt_obj@assays$RNA))
+head(colnames(opa1_obj@assays$RNA))
+
 ```
 
-
-
-
-
-
-How could we tell how many reads are being considered across all cells in each sample?  
+Total reads across all cells in each sample
 
 ```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
-# TO DO
 
 sum(wt_obj@meta.data$nCount_RNA)
 sum(opa1_obj@meta.data$nCount_RNA)
@@ -128,25 +122,17 @@ sum(opa1_obj@meta.data$nCount_RNA)
 #     Add sample specific metadata
 ##    Add genotype id 
 ```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
-# TO DO
+
 wt_obj <- AddMetaData(wt_obj, metadata = "wt", col.name = "genotype")
 opa1_obj <- AddMetaData(opa1_obj, metadata = "opa1", col.name = "genotype")
 
-
-```
-
-Now let's check that our metadata looks good:  
-
-```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
-# TO DO
 head(wt_obj@meta.data)
 head(opa1_obj@meta.data)
-#genotype data added
+
 ```
 
 #     Merge Data
 ```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
-# TO DO
 
 merged_data_object <- merge(x = wt_obj,
                             y = opa1_obj,
@@ -156,39 +142,27 @@ merged_data_object <- JoinLayers(merged_data_object)
 
 ```
 
-
 ##    Check merge success  
-It is critical that once the data has been merged, that you check the final merged data set to make sure it is what you expected.  
-<br/>  
-
-4.  Check that the object merged correctly by:  
-
-* performing a `head` on the `meta.data`  
-* performing a `tail` on the `meta.data`  
-* generating a table summary of the `orig.ident` that shows how many cells come from each sample  
 
 ```{r include = TRUE, echo = TRUE}
-#TO DO
 
 head(merged_data_object@meta.data)
 tail(merged_data_object@meta.data)
 table(merged_data_object@meta.data$orig.ident)
 
-
 ```
-
 
 #     Managing memory and space - post merge
 ```{r include=TRUE, echo=TRUE}
-#TO DO
+
 rm(wt, wt_obj, opa1, opa1_obj)
 gc()
+
 ```
 
 #     Data Setup and Formatting 
 ## Calculating per cell complexity and adding this to the metadata  
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 merged_data_object <- AddMetaData(object = merged_data_object,
                                   metadata = log10(merged_data_object$nFeature_RNA)/log10(merged_data_object$nCount_RNA),col.name = "complexity")
@@ -199,7 +173,6 @@ tail(merged_data_object$complexity)
 
 ## Calculating mitochondrial read percentage per cell and adding this to the metadata  
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 grep(rownames(merged_data_object@assays$RNA), pattern = "mt-", value = TRUE)
 #Looks like "mt-" is the identifier for mitochondrial genes in this set
@@ -212,13 +185,9 @@ tail(merged_data_object$mitoPct)
 
 ```
 
-<br/> 
-
-
 #     Initial Data Exploration 
 ##    Total Cells per Sample  
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 ggplot(merged_data_object@meta.data, aes(x=orig.ident, fill=orig.ident)) +
 geom_bar() +
@@ -227,14 +196,10 @@ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
 theme(plot.title = element_text(hjust=0.5, face="bold")) +
 ggtitle("Number of Cells Per Sample (raw)")
 
-
 ```
-
-<br/>  
 
 ##    Distribution of total number of reads per cell  
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
 ggplot(merged_data_object@meta.data, aes(color=orig.ident, x=nCount_RNA, fill= orig.ident)) +
 geom_density(alpha = 0.2) +
@@ -243,23 +208,16 @@ theme_classic() +
 ylab("Cell density") +
 ggtitle("Distribution of reads per cell across samples")
 
-
 ```
-
-<br/>  
 
 ##    Distribution of total number of unique genes expressed per cell  
 ```{r include = TRUE, echo = TRUE}
-# TO DO
 
-#similar code, just changing out the metadata column that we are graphing
 ggplot(merged_data_object@meta.data, aes(color=orig.ident, x=nFeature_RNA, fill= orig.ident)) +
  geom_density(alpha = 0.2) +
  theme_classic() +
  scale_x_log10() +
 ggtitle("Distribution of total unique genes per cell across samples")
-
-# TO DO -- THE BOXPLOT VERSION
 
 ggplot(merged_data_object@meta.data, aes(x=orig.ident, y=log10(nFeature_RNA), fill=orig.ident)) +
 geom_boxplot() +
@@ -268,16 +226,10 @@ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
 theme(plot.title = element_text(hjust=0.5, face="bold")) +
 ggtitle("Distribution of unique genes expressed per cell (raw)")
 
-
 ```
-
-<br/>  
 
 ##    Joint plot of reads, genes, and mitochondrial percentage  
 ```{r include = TRUE, echo = FALSE, message = FALSE, warning=FALSE}
-# TO DO 
-
-#
 
 ggplot(merged_data_object@meta.data, aes(x=nCount_RNA, y=nFeature_RNA, color=mitoPct)) +
    geom_point() +
@@ -290,11 +242,8 @@ ggplot(merged_data_object@meta.data, aes(x=nCount_RNA, y=nFeature_RNA, color=mit
 
 ```
 
-<br/>  
-
 ##    Distribution of mitochondrial percent per cell  
 ```{r include=TRUE, echo=TRUE, warning = FALSE}
-# TO DO
 
 ggplot(merged_data_object@meta.data, aes(color=orig.ident, x=mitoPct, fill=orig.ident)) +
 geom_density(alpha = 0.2) +
@@ -305,12 +254,8 @@ ggtitle("Distribution of mitochondrial contamination per cell across samples")
 #Expected that the Opa1ko have even less mito chontamination than normal because the MITOCHONDRIAL GENOME IS NOT MAINTAINED in Opa1ko cells!!
 ```
 
-<br/>  
-
 ##    Distribution of library complexity per cell
 ```{r include=TRUE, echo=TRUE}
-# TO DO
-
 
 ggplot(merged_data_object@meta.data, aes(x=complexity, color = orig.ident, fill=orig.ident)) +
         geom_density(alpha = 0.2) +
@@ -321,31 +266,21 @@ ggplot(merged_data_object@meta.data, aes(x=complexity, color = orig.ident, fill=
 
 ##    Other plots  
 ```{r include=TRUE, echo=TRUE}
-# TO DO
 
 VlnPlot(merged_data_object, features = c("nFeature_RNA", "nCount_RNA", "mitoPct"), ncol = 3)
 VlnPlot(merged_data_object, features = c("nFeature_RNA", "nCount_RNA", "mitoPct"), stack = T)
 
 ```
 
-
-
-
-
-
-
-
 #     Filtering 
 ##    Cell-Level filtering
 
-* keep cells with at least 200 unique genes present per cell  
-* keep cells with at 1000 reads present per cell  
-* keep cells that have a mitochondrial contamination percent of less than 20%  
-* keep cell with a complexity of greater than 80%  
-
+* keep cells with at least 2000 unique genes present per cell  
+* keep cells with at 8500 reads present per cell  
+* keep cells that have a mitochondrial contamination percent of less than 10%  
+* keep cell with a complexity of greater than 75%  
 
 ```{r include = TRUE, echo = TRUE}
-# TO DO  
 
 filtered_data_object <- subset(x = merged_data_object,
                                subset = 
@@ -359,7 +294,6 @@ filtered_data_object <- subset(x = merged_data_object,
 * The total number of cell after filtering  
 
 ```{r include = TRUE, echo = TRUE}
-# TO DO  
 
 #this pulls the counts from the RNA object in the Seurat object
 paste("The number of cells prior to filtering:")
@@ -367,7 +301,6 @@ dim(merged_data_object@meta.data)[1]
 
 paste("The number of cells after filtering:")
 dim(filtered_data_object@meta.data)[1]
-
 
 ```
 
@@ -394,7 +327,6 @@ less_10_matrix <- counts[less_10,]
 dim(less_10_matrix)
 head(less_10_matrix)
 
-
 #Using 10 as cutoff
 keep_genes <- Matrix::rowSums(nonzero) >= 10
 filtered_counts <- counts[keep_genes, ]
@@ -409,13 +341,12 @@ dim(filtered_data_object@assays$RNA@features)
 #less_10_matrix is the genes that remain after filtering. so ~18k genes remain after filtering
 print(dim(filtered_data_object@assays$RNA@features)[1] - dim(less_10_matrix)[1])
 
-
 filtered_data_object <- CreateSeuratObject(counts = filtered_counts, meta.data = filtered_data_object@meta.data)
 ```
 
-
 #     Post-Filtering Data Exploration  
 ##    Total Cells per Sample  
+
 ```{r include = TRUE, echo = TRUE}
 
 ggplot(filtered_data_object@meta.data, aes(x=orig.ident, fill=orig.ident)) +
@@ -425,7 +356,7 @@ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
 theme(plot.title = element_text(hjust=0.5, face="bold"))
 
 ```
-<br/>  
+
 ##    Distribution of total number of reads per cell  
 
 ```{r include = TRUE, echo = TRUE}
@@ -438,6 +369,7 @@ ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nCount_RNA, fill=
   geom_vline(xintercept = 1000, linetype = "dashed", color = "orange", linewidth = 2)
 
 ```
+
 ##    Distribution of total number of unique genes expressed per cell  
 
 ```{r include = TRUE, echo = TRUE, warning=FALSE}
@@ -448,10 +380,7 @@ ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nFeature_RNA, fil
   theme_classic() +
   ylab("Cell density")
 
-
 ```
-
-<br/>  
 
 ##    Joint plot of reads, genes, and mitochondrial percentage  
 
@@ -490,8 +419,6 @@ theme_classic()
 
 ```
 
-<br/>  
-
 ##    Other plots  
 
 ```{r include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
@@ -501,7 +428,6 @@ VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPc
 
 ```
 
-
 ##    Managing memory and space  .   
 
 ```{r include=TRUE, echo=TRUE}
@@ -510,10 +436,7 @@ VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPc
 rm(nonzero, keep_genes, counts, filtered_counts, less_10_matrix, less_10)
 gc()
 
-
 ```
-
-<br/>  
 
 #     Normalization and gene score calculations   
 Now that we have visually identified some cell-level thresholds  
@@ -531,7 +454,6 @@ filtered_data_object@assays$RNA@layers
 
 #merged data object has integers. So we're good
 merged_data_object@assays$RNA@layers
-
 
 ```
 
@@ -574,6 +496,7 @@ theme(plot.title = element_text(hjust=0.5, face="bold"))
 
 ##    Identify most variable genes  
 Use 2000 most variable genes:
+Double check the list of genes that are generated: we do want to use these for PCA analysis, right?
 
 ```{r include = TRUE, echo=TRUE}
 
@@ -588,8 +511,6 @@ filtered_data_object <- FindVariableFeatures(object = filtered_data_object,
 VariableFeatures(object = filtered_data_object,
                  selection.method = "vst",
                  assay = "RNA")
-
-# TO DO : EXPLORE YOUR VARIABLE FEATURES -- ARE THESE THE GENES YOU WANT TO USE FOR CLUSTERING?
 
 variableGeneDf <- as_tibble(HVFInfo(filtered_data_object,
                                     selection.method = "vst",
@@ -609,7 +530,6 @@ ggplot(variableGeneDf, aes(x = log(mean),
                        geom_point()
 
 ```
-
 
 ##    Scale the data 
   *Regress out cell cycle
@@ -633,10 +553,7 @@ filtered_data_object <- RunPCA(object = filtered_data_object,
                                npcs = 50,
                                weight.by.var = TRUE)
 
-
 ```
-
-<br/>  
 
 ##    Visualizing of principle components  
 ###   Dim Plots
@@ -721,7 +638,6 @@ DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_umap", g
 DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_umap", group.by = "Phase", split.by = "orig.ident")
 
 ```
-
 
 #     Clustering 
 
@@ -860,8 +776,6 @@ Wanted to try it for the sake of practice but ran into issues installing lisi li
 ```
 
 
-
-
 #     Covariate check of clusters     
 
 ##Feature plots
@@ -903,7 +817,6 @@ FeaturePlot(object = filtered_data_object,
 ```{r include = TRUE, echo = TRUE}
 
 VlnPlot(filtered_data_object, features = c("Cd19","Ms4a1","Hba-a1", "H2-Ab1","Ncr1","Cd3e","Cd8a","Spi1", "Cd4", "Cd24a", "Ikzf2", "Cd163l1","Igf1r","St6galnac3", "Itgal", "Itgam", "Fcgr3a"),group.by = "seurat_clusters", combine = FALSE)
-
 
 ``` 
 
@@ -953,15 +866,15 @@ table(Tcell_data_object@meta.data$Phase, Tcell_data_object@meta.data$genotype)
 ##    ReRun t-SNE, UMAP, and clustering for Tcell only data
 ###   PCs - still 20
 ```{r include = TRUE, echo = TRUE}
-
-ElbowPlot(object = Tcell_data_object, ndims = 50, reduction = "pca")
-pcs = 20
-
+#Tcell_data_object PCA analysis
 Tcell_data_object <- RunPCA(object = Tcell_data_object,
                                assay = "RNA",
                                seed.use = 42,
                                npcs = 50,
                                weight.by.var = TRUE)
+
+ElbowPlot(object = Tcell_data_object, ndims = 50, reduction = "pca")
+pcs = 20
 
 Tcell_data_object <- FindNeighbors(object = Tcell_data_object,
                                       reduction = "pca",
@@ -1004,12 +917,14 @@ DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.
 
 
 ##    Re-Clustering
+      Looking for 4 clusters here - they will wind up being naive, d5 G1, d5 dividing, and d5 Opa1-unique
+      Have had to change the resolution between 0.05 and 0.1 before
 
-###   Resolution using = 0.05 (241213)
+###   Resolution using = 0.075 (241213)
 
 ```{r include = TRUE, echo = TRUE}
 Tcell_data_object <- FindClusters(object = Tcell_data_object,
-                                     resolution = 0.05,
+                                     resolution = 0.075,
                                      algorithm = 1,
                                      random.seed = 18)
 
@@ -1018,17 +933,17 @@ DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
         label = FALSE,
         label.size = 6,
-        group.by = "RNA_snn_res.0.05",
+        group.by = "RNA_snn_res.0.075",
         split.by = "orig.ident") +
-        ggtitle("Resolution = 0.05")
+        ggtitle("Resolution = 0.075")
 
 DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
         label = FALSE,
         label.size = 6,
-        group.by = "RNA_snn_res.0.05",
+        group.by = "RNA_snn_res.0.075",
         split.by = "Phase") +
-        ggtitle("Resolution = 0.05")
+        ggtitle("Resolution = 0.075")
 
 DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
@@ -1036,12 +951,12 @@ DimPlot(object = Tcell_data_object,
         label.size = 6,
         group.by = "orig.ident",
         split.by = "Phase") +
-        ggtitle("Resolution = 0.05")
+        ggtitle("Resolution = 0.075")
 
 # Get number of cells per cluster and per sample of origin
-table(Tcell_data_object@meta.data$RNA_snn_res.0.05, Tcell_data_object@meta.data$orig.ident)
+table(Tcell_data_object@meta.data$RNA_snn_res.0.1, Tcell_data_object@meta.data$orig.ident)
 
-Idents(object = Tcell_data_object) <- "RNA_snn_res.0.05"
+Idents(object = Tcell_data_object) <- "RNA_snn_res.0.075"
 ```
 
 ###   Other resolutions tested
@@ -1092,6 +1007,115 @@ DimPlot(object = Tcell_data_object,
 
 
 
+
+
+##     Redo PCAs for Tcell_data_object 
+```{r include = TRUE, echo=TRUE}
+# TO DO
+#2000 genes is a good starting point, no real need to use 5k or more
+#FindVariableFeatures knows to use the normalized data. Back end Seurat stuff going on here, don't really need to worry about that
+Tcell_data_object <- FindVariableFeatures(object = Tcell_data_object,
+                                             selection.method = "vst",
+                                             nfeatures = 2000,
+                                             verbose = FALSE,
+                                             assay = "RNA")
+
+head(VariableFeatures(object = Tcell_data_object,
+                 selection.method = "vst",
+                 assay = "RNA"))
+
+# TO DO : EXPLORE YOUR VARIABLE FEATURES -- ARE THESE THE GENES YOU WANT TO USE FOR CLUSTERING?
+
+variableGeneDf <- as_tibble(HVFInfo(Tcell_data_object,
+                                    selection.method = "vst",
+                                    status = TRUE,
+                                    assay = "RNA"),
+                                    rownames = "Gene")
+
+variableGeneDf = variableGeneDf %>%
+  mutate(hypervariable=Gene %in%
+           VariableFeatures(Tcell_data_object,
+                            selection.method = "vst",
+                            assay = "RNA"))
+
+ggplot(variableGeneDf, aes(x = log(mean),
+                       y = log(variance),
+                       color = hypervariable)) +
+                       geom_point()
+
+```
+
+
+###    Scale the data 
+          This may not be needed? since it was scaled earlier?
+          *Regress out cell cycle
+
+```{r include = TRUE, echo = TRUE}
+
+Tcell_data_object <- ScaleData(object = Tcell_data_object,
+                                  assay = "RNA",
+                                  vars.to.regress = "Phase")
+
+
+```
+
+###    Calculate principle components 
+
+```{r include = TRUE, echo = TRUE}
+
+Tcell_data_object <- RunPCA(object = Tcell_data_object,
+                               assay = "RNA",
+                               seed.use = 42,
+                               npcs = 50,
+                               weight.by.var = TRUE)
+
+
+```
+
+###    Decide how many PCs to use.
+          Using 20
+
+```{r include = TRUE, echo = TRUE}
+
+ElbowPlot(object = Tcell_data_object, ndims = 50, reduction = "pca")
+pcs = 20
+
+```
+
+###    t-SNE    
+```{r include = TRUE, echo = TRUE}
+
+Tcell_data_object <- RunTSNE(object = Tcell_data_object,
+                                dims = 1:pcs,
+                                reduction = "pca",
+                                assay = "RNA",
+                                seed.use = 42,
+                                reduction.name = "Tcell_tsne")
+
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_tsne", group.by = "orig.ident")
+
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_tsne", group.by = "Phase")
+
+```
+
+###    UMAP  
+```{r include = TRUE, echo = TRUE}
+
+Tcell_data_object <- RunUMAP(object = Tcell_data_object,
+                                dims = 1:pcs,
+                                reduction = "pca",
+                                assay = "RNA",
+                                n.neighbors = 30,
+                                seed.use = 18,
+                                reduction.name = "Tcell_umap")
+
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "Phase")
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "Phase", split.by = "orig.ident")
+
+```
+
+
 ##    T cell UMAP if needed
 ```{r include = TRUE, echo = TRUE}
 
@@ -1099,9 +1123,9 @@ DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
         label = FALSE,
         label.size = 6,
-        group.by = "RNA_snn_res.0.05",
+        group.by = "RNA_snn_res.0.075",
         split.by = "orig.ident") +
-        ggtitle("Resolution = 0.05")
+        ggtitle("Resolution = 0.075")
 
 DimPlot(object = Tcell_data_object,
         reduction = "Tcell_umap",
@@ -1115,7 +1139,7 @@ DimPlot(object = Tcell_data_object,
 
 
 #     T Cell cluster wrangling
-          Resolution = 0.05 (This has been 0.1 before. Looking for 4 total clusters: naive and 3 activated. 2 G1 clusters, 2                    dividing)
+          Resolution = 0.075 (This has been 0.1 before. Looking for 4 total clusters: naive and 3 activated. 2 G1                clusters, 2 dividing)
 ##   Identify Naive T cell cluster based on Lef1 and Tcf7 expression.
 ```{r include = TRUE, echo = TRUE}
 
@@ -1133,7 +1157,7 @@ FeaturePlot(object = Tcell_data_object,
 
 ```
 
-##    Label cells as Naive and activated. Made new seurat objects to do this (probably an easier way?). Recombined and replaced           Tcell_data_object
+##    Label cells as Naive and activated. Made new seurat objects to do this (probably an easier way?). Recombined and replaced Tcell_data_object
       Can save Naive and activated groups of cells as RDS files, if wanted for some type of analysis that way.
 
 ```{r include = TRUE, echo = TRUE}
@@ -1144,7 +1168,7 @@ Naive_data_object <- Tcell_data_object %>% subset(seurat_clusters %in% c("0"))
 Naive_data_object <- AddMetaData(Naive_data_object, metadata = "naive", col.name = "activation_status")
 
 #save/load if needed
-#saveRDS(object = Naive_data_object, "~/Desktop/Opa1_scRNAseq/241207_naive_object_phase_regress.RDS")
+#saveRDS(object = Naive_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/Naive_object_phase_regress.RDS")
 #Naive_data_object <- readRDS("~/Desktop/Opa1_scRNAseq/241207_naive_object_phase_regress.RDS")
 
 #activated
@@ -1152,8 +1176,8 @@ Activated_data_object <- Tcell_data_object %>% subset(seurat_clusters %in% c("1"
 Activated_data_object <- AddMetaData(Activated_data_object, metadata = "activated", col.name = "activation_status")
 
 #Save/load if needed
-#saveRDS(object = Activated_data_object, "~/Desktop/Opa1_scRNAseq/241207_activated_object_phase_regress.RDS")
-#Activated_data_object <- readRDS("~/Desktop/Opa1_scRNAseq/241207_activated_object_phase_regress.RDS")
+#saveRDS(object = Activated_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/Activated_object_phase_regress.RDS")
+#Activated_data_object <- readRDS("~/Documents/Sandbox/Opa1-scRNAseq/Activated_object_phase_regress.RDS"")
 
 
 #Merge data back together
@@ -1162,7 +1186,8 @@ Tcell_data_object <- merge(x = Naive_data_object,
 
 Tcell_data_object <- JoinLayers(Tcell_data_object)
 
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
+#need to rerun PCA, tsne, UMAP before doing this
+#DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
 table(Tcell_data_object@meta.data$activation_status, Tcell_data_object@meta.data$orig.ident)
 table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$orig.ident)
 table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$activation_status)
@@ -1177,6 +1202,7 @@ table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$activation_sta
 Tcell_data_object
 
 Tcell_data_object$RNA_snn_res.0.05 <- NULL
+Tcell_data_object$RNA_snn_res.0.1 <- NULL
 Tcell_data_object$RNA_snn_res.0.2 <- NULL
 Tcell_data_object$RNA_snn_res.0.3 <- NULL
 Tcell_data_object$RNA_snn_res.0.4 <- NULL
@@ -1437,14 +1463,7 @@ gc()
 
 ```
 
-Putting in some change here. Can I add this to the 'initial analysis branch'?
 
-```{r include=TRUE, echo=TRUE}
-
-Trying to figure out commits with branches and then merging it with main
-
-
-```
 
 
 
