@@ -864,24 +864,7 @@ table(Tcell_data_object@meta.data$Phase, Tcell_data_object@meta.data$genotype)
 ```
 
 ##    ReRun t-SNE, UMAP, and clustering for Tcell only data
-###   PCs - still 20
-```{r include = TRUE, echo = TRUE}
-#Tcell_data_object PCA analysis
-Tcell_data_object <- RunPCA(object = Tcell_data_object,
-                               assay = "RNA",
-                               seed.use = 42,
-                               npcs = 50,
-                               weight.by.var = TRUE)
 
-ElbowPlot(object = Tcell_data_object, ndims = 50, reduction = "pca")
-pcs = 20
-
-Tcell_data_object <- FindNeighbors(object = Tcell_data_object,
-                                      reduction = "pca",
-                                      dims = 1:pcs,
-                                      assay = "RNA")
-
-```
 ### t-SNE    
 ```{r include = TRUE, echo = TRUE}
 
@@ -1009,6 +992,66 @@ DimPlot(object = Tcell_data_object,
 
 
 
+
+#     T Cell cluster wrangling
+          Resolution = 0.075 (This has been 0.1 before. Looking for 4 total clusters: naive and 3 activated. 2 G1                clusters, 2 dividing)
+##   Identify Naive T cell cluster based on Lef1 and Tcf7 expression.
+```{r include = TRUE, echo = TRUE}
+
+FeaturePlot(object = Tcell_data_object,
+            reduction = "Tcell_umap",
+            features = "Lef1",
+            split.by = "orig.ident",
+            order = FALSE) + theme(legend.position = c(0.8,0.9))
+
+FeaturePlot(object = Tcell_data_object,
+            reduction = "Tcell_umap",
+            features = "Tcf7",
+            split.by = "orig.ident",
+            order = FALSE) + theme(legend.position = c(0.8,0.9))
+
+```
+
+##    Label cells as Naive and activated. Made new seurat objects to do this (probably an easier way?). Recombined and replaced Tcell_data_object
+      Can save Naive and activated groups of cells as RDS files, if wanted for some type of analysis that way.
+
+```{r include = TRUE, echo = TRUE}
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
+
+#naive
+Naive_data_object <- Tcell_data_object %>% subset(seurat_clusters %in% c("0"))
+Naive_data_object <- AddMetaData(Naive_data_object, metadata = "naive", col.name = "activation_status")
+
+#save/load if needed
+#saveRDS(object = Naive_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/Naive_object_phase_regress.RDS")
+#Naive_data_object <- readRDS("~/Desktop/Opa1_scRNAseq/241207_naive_object_phase_regress.RDS")
+
+#activated
+Activated_data_object <- Tcell_data_object %>% subset(seurat_clusters %in% c("1", "2", "3"))
+Activated_data_object <- AddMetaData(Activated_data_object, metadata = "activated", col.name = "activation_status")
+
+#Save/load if needed
+#saveRDS(object = Activated_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/Activated_object_phase_regress.RDS")
+#Activated_data_object <- readRDS("~/Documents/Sandbox/Opa1-scRNAseq/Activated_object_phase_regress.RDS"")
+
+
+#Merge data back together
+Tcell_data_object <- merge(x = Naive_data_object,
+                           y = Activated_data_object)
+
+Tcell_data_object <- JoinLayers(Tcell_data_object)
+
+table(Tcell_data_object@meta.data$activation_status, Tcell_data_object@meta.data$orig.ident)
+table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$orig.ident)
+table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$activation_status)
+
+
+
+```
+
+I need to rerun PCA, tsne, and UMAP for Tcell object. And rescale the data. The first command in the last section (Dimplot) will NOT work right now because the PCA and reductions are not in Tcell object anymore
+Yes, probably could've done this in a less computationally expensive way. Like adding metadata based on cluster... Doing this for now and will come back later and redo it if I have time
+
 ##     Redo PCAs for Tcell_data_object 
 ```{r include = TRUE, echo=TRUE}
 # TO DO
@@ -1023,8 +1066,6 @@ Tcell_data_object <- FindVariableFeatures(object = Tcell_data_object,
 head(VariableFeatures(object = Tcell_data_object,
                  selection.method = "vst",
                  assay = "RNA"))
-
-# TO DO : EXPLORE YOUR VARIABLE FEATURES -- ARE THESE THE GENES YOU WANT TO USE FOR CLUSTERING?
 
 variableGeneDf <- as_tibble(HVFInfo(Tcell_data_object,
                                     selection.method = "vst",
@@ -1047,7 +1088,6 @@ ggplot(variableGeneDf, aes(x = log(mean),
 
 
 ###    Scale the data 
-          This may not be needed? since it was scaled earlier?
           *Regress out cell cycle
 
 ```{r include = TRUE, echo = TRUE}
@@ -1055,7 +1095,6 @@ ggplot(variableGeneDf, aes(x = log(mean),
 Tcell_data_object <- ScaleData(object = Tcell_data_object,
                                   assay = "RNA",
                                   vars.to.regress = "Phase")
-
 
 ```
 
@@ -1068,7 +1107,6 @@ Tcell_data_object <- RunPCA(object = Tcell_data_object,
                                seed.use = 42,
                                npcs = 50,
                                weight.by.var = TRUE)
-
 
 ```
 
@@ -1138,65 +1176,9 @@ DimPlot(object = Tcell_data_object,
 ```
 
 
-#     T Cell cluster wrangling
-          Resolution = 0.075 (This has been 0.1 before. Looking for 4 total clusters: naive and 3 activated. 2 G1                clusters, 2 dividing)
-##   Identify Naive T cell cluster based on Lef1 and Tcf7 expression.
-```{r include = TRUE, echo = TRUE}
-
-FeaturePlot(object = Tcell_data_object,
-            reduction = "Tcell_umap",
-            features = "Lef1",
-            split.by = "orig.ident",
-            order = FALSE) + theme(legend.position = c(0.8,0.9))
-
-FeaturePlot(object = Tcell_data_object,
-            reduction = "Tcell_umap",
-            features = "Tcf7",
-            split.by = "orig.ident",
-            order = FALSE) + theme(legend.position = c(0.8,0.9))
-
-```
-
-##    Label cells as Naive and activated. Made new seurat objects to do this (probably an easier way?). Recombined and replaced Tcell_data_object
-      Can save Naive and activated groups of cells as RDS files, if wanted for some type of analysis that way.
-
-```{r include = TRUE, echo = TRUE}
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
-
-#naive
-Naive_data_object <- Tcell_data_object %>% subset(seurat_clusters %in% c("0"))
-Naive_data_object <- AddMetaData(Naive_data_object, metadata = "naive", col.name = "activation_status")
-
-#save/load if needed
-#saveRDS(object = Naive_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/Naive_object_phase_regress.RDS")
-#Naive_data_object <- readRDS("~/Desktop/Opa1_scRNAseq/241207_naive_object_phase_regress.RDS")
-
-#activated
-Activated_data_object <- Tcell_data_object %>% subset(seurat_clusters %in% c("1", "2", "3"))
-Activated_data_object <- AddMetaData(Activated_data_object, metadata = "activated", col.name = "activation_status")
-
-#Save/load if needed
-#saveRDS(object = Activated_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/Activated_object_phase_regress.RDS")
-#Activated_data_object <- readRDS("~/Documents/Sandbox/Opa1-scRNAseq/Activated_object_phase_regress.RDS"")
-
-
-#Merge data back together
-Tcell_data_object <- merge(x = Naive_data_object,
-                           y = Activated_data_object)
-
-Tcell_data_object <- JoinLayers(Tcell_data_object)
-
-#need to rerun PCA, tsne, UMAP before doing this
-#DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
-table(Tcell_data_object@meta.data$activation_status, Tcell_data_object@meta.data$orig.ident)
-table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$orig.ident)
-table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$activation_status)
-
-
-```
-
 ##    Clean up metadata - remove unused columns
           Tried a few ways. This worked. Not efficient, I know.
+          Clustering resolution is still 0.075
 ```{r include = TRUE, echo = TRUE}
 
 Tcell_data_object
@@ -1227,210 +1209,24 @@ Tcell_data_object
 
 ```
 
-##     Redo PCAs for Tcell_data_object 
-```{r include = TRUE, echo=TRUE}
-# TO DO
-#2000 genes is a good starting point, no real need to use 5k or more
-#FindVariableFeatures knows to use the normalized data. Back end Seurat stuff going on here, don't really need to worry about that
-Tcell_data_object <- FindVariableFeatures(object = Tcell_data_object,
-                                             selection.method = "vst",
-                                             nfeatures = 2000,
-                                             verbose = FALSE,
-                                             assay = "RNA")
-
-head(VariableFeatures(object = Tcell_data_object,
-                 selection.method = "vst",
-                 assay = "RNA"))
-
-# TO DO : EXPLORE YOUR VARIABLE FEATURES -- ARE THESE THE GENES YOU WANT TO USE FOR CLUSTERING?
-
-variableGeneDf <- as_tibble(HVFInfo(Tcell_data_object,
-                                    selection.method = "vst",
-                                    status = TRUE,
-                                    assay = "RNA"),
-                                    rownames = "Gene")
-
-variableGeneDf = variableGeneDf %>%
-  mutate(hypervariable=Gene %in%
-           VariableFeatures(Tcell_data_object,
-                            selection.method = "vst",
-                            assay = "RNA"))
-
-ggplot(variableGeneDf, aes(x = log(mean),
-                       y = log(variance),
-                       color = hypervariable)) +
-                       geom_point()
-
-```
-
-
-###    Scale the data 
-          This may not be needed? since it was scaled earlier?
-          *Regress out cell cycle
-
-```{r include = TRUE, echo = TRUE}
-
-Tcell_data_object <- ScaleData(object = Tcell_data_object,
-                                  assay = "RNA",
-                                  vars.to.regress = "Phase")
-
-
-```
-
-###    Calculate principle components 
-
-```{r include = TRUE, echo = TRUE}
-
-Tcell_data_object <- RunPCA(object = Tcell_data_object,
-                               assay = "RNA",
-                               seed.use = 42,
-                               npcs = 50,
-                               weight.by.var = TRUE)
-
-
-```
-
-###    Decide how many PCs to use.
-          Using 20
-
-```{r include = TRUE, echo = TRUE}
-
-ElbowPlot(object = Tcell_data_object, ndims = 50, reduction = "pca")
-pcs = 20
-
-```
-
-###    t-SNE    
-```{r include = TRUE, echo = TRUE}
-
-Tcell_data_object <- RunTSNE(object = Tcell_data_object,
-                                dims = 1:pcs,
-                                reduction = "pca",
-                                assay = "RNA",
-                                seed.use = 42,
-                                reduction.name = "Tcell_tsne")
-
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_tsne", group.by = "orig.ident")
-
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_tsne", group.by = "Phase")
-
-```
-
-###    UMAP  
-```{r include = TRUE, echo = TRUE}
-
-Tcell_data_object <- RunUMAP(object = Tcell_data_object,
-                                dims = 1:pcs,
-                                reduction = "pca",
-                                assay = "RNA",
-                                n.neighbors = 30,
-                                seed.use = 18,
-                                reduction.name = "Tcell_umap")
-
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "Phase")
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "Phase", split.by = "orig.ident")
-
-```
-
-
-##      Re-Clustering T cell object
-###     Resolution using = 0.1
-```{r include = TRUE, echo = TRUE}
-Tcell_data_object <- FindNeighbors(object = Tcell_data_object,
-                                      reduction = "pca",
-                                      dims = 1:pcs,
-                                      assay = "RNA")
-
-Tcell_data_object <- FindClusters(object = Tcell_data_object,
-                                     resolution = 0.1,
-                                     algorithm = 1,
-                                     random.seed = 18)
-#
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        cols = c("Sky Blue", "Black"),
-        label = FALSE,
-        label.size = 6,
-        group.by = "orig.ident") +
-        ggtitle("")
-
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.1") +
-        ggtitle("")
-
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "Phase",
-        split.by = "orig.ident") +
-        ggtitle("Cell cycle phase by genotype")
-
-# Get number of cells per cluster and per sample of origin
-table(Tcell_data_object@meta.data$RNA_snn_res.0.1, Tcell_data_object@meta.data$orig.ident)
-
-Idents(object = Tcell_data_object) <- "RNA_snn_res.0.1"
-```
-####    Other resolutions tested (0.15 0.2 0.25)
-```{r include = TRUE, echo = TRUE}
-
-Tcell_data_object <- FindClusters(object = Tcell_data_object,
-                                     resolution = c(0.1, 0.15, 0.2,0.3),
-                                     algorithm = 1,
-                                     random.seed = 18)
-
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.1",
-        split.by = "orig.ident") +
-        ggtitle("Resolution = 0.1")
-
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.15",
-        split.by = "orig.ident") +
-        ggtitle("Resolution = 0.15")
-
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.3",
-        split.by = "orig.ident") +
-        ggtitle("Resolution = 0.3")
-
-```
-
-##    Renaming T cell clusters (4 of them)
-
-```{r include = TRUE, echo = TRUE}
-
-FeaturePlot(object = Tcell_data_object,
-            reduction = "Tcell_umap",
-            features = "Lef1",
-            split.by = "orig.ident",
-            order = FALSE) + theme(legend.position = c(0.8,0.9))
-
-cluster_names <- c("Naive","d5_dividing", "d5_G1","d5_opa1_unique")
-
-#This will rename the factors in seurat_clusters to the names I put in the list from the last command
-levels(Tcell_data_object@meta.data$seurat_clusters) <- as.factor(cluster_names)
-
-#Active ident set to the new set of cluster names too
-levels(Tcell_data_object@active.ident) <- as.factor(cluster_names)
-```
 
 
 
-##    Removing the WT cells in the opa1_unique cluster (has popped up before. Not needed 241213)
+
+
+
+
+
+
+
+
+
+
+
+delete down below??? - have not renamed the clusters yet!
+
+
+#    Removing the WT cells in the opa1_unique cluster (has popped up before. Not needed 241213)
 ```{r include = TRUE, echo = TRUE}
 
 #found the wt cell in this clusters: "wt_TGTTACTTCACAATGC"
@@ -1439,7 +1235,7 @@ head(WhichCells(Tcell_data_object, ident = "d5_opa1_unique"), 10)
 
 #wt cell has been removed
 #Tcell_data_object <- Tcell_data_object[, !colnames(Tcell_data_object) %in% toRemove]
-table(Tcell_data_object@meta.data$RNA_snn_res.0.1, Tcell_data_object@meta.data$orig.ident)
+table(Tcell_data_object@meta.data$RNA_snn_res.0.075, Tcell_data_object@meta.data$orig.ident)
 
 ```
 
