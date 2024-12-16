@@ -1023,16 +1023,16 @@ Naive_data_object <- Tcell_data_object %>% subset(seurat_clusters %in% c("0"))
 Naive_data_object <- AddMetaData(Naive_data_object, metadata = "naive", col.name = "activation_status")
 
 #save/load if needed
-#saveRDS(object = Naive_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/Naive_object_phase_regress.RDS")
-#Naive_data_object <- readRDS("~/Desktop/Opa1_scRNAseq/241207_naive_object_phase_regress.RDS")
+#saveRDS(object = Naive_data_object,"~/Documents/Sandbox/Opa1-scRNAseq/seurat_objects/Naive_object_phase_regress.RDS")
+#Naive_data_object <- readRDS("~/Desktop/Opa1_scRNAseq/seurat_objects/241207_naive_object_phase_regress.RDS")
 
 #activated
 Activated_data_object <- Tcell_data_object %>% subset(seurat_clusters %in% c("1", "2", "3"))
 Activated_data_object <- AddMetaData(Activated_data_object, metadata = "activated", col.name = "activation_status")
 
 #Save/load if needed
-#saveRDS(object = Activated_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/Activated_object_phase_regress.RDS")
-#Activated_data_object <- readRDS("~/Documents/Sandbox/Opa1-scRNAseq/Activated_object_phase_regress.RDS"")
+#saveRDS(object = Activated_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/seurat_objects/Activated_object_phase_regress.RDS")
+#Activated_data_object <- readRDS("~/Documents/Sandbox/Opa1-scRNAseq/seurat_objects/Activated_object_phase_regress.RDS"")
 
 
 #Merge data back together
@@ -1280,6 +1280,76 @@ gc()
 ```
 
 
+#   Save/load T cell data object after cleaning up, clustering, and IDing/naming clusters
+    if needed
+
+```{r include=TRUE, echo=TRUE}
+
+
+saveRDS(object = Tcell_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/seurat_objects/Tcell_data_obj.RDS")
+Tcell_data_object <- readRDS("~/Documents/Sandbox/Opa1-scRNAseq/seurat_objects/Tcell_data_obj.RDS")
+
+
+saveRDS(object = filtered_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/seurat_objects/filtered_data_object.RDS")
+
+#Filtered data object load if needbe (might need to do to figure out differences between v4 and v5)
+filtered_data_object <- readRDS("~/Desktop/Opa1_scRNAseq/seurat_objects/filtered_data_object.RDS")
+
+```
+
+#     Notes:
+      
+      - Tcell data object (4 clusters) have clusters labeled by naive, d5_g1, d5_dividing, d5_opa1_unique
+      - Tcell cluster resolution = 0.075
+
+#     Compiled functions for later analysis
+##    Markers() --> filter output --> generate .txt file to copy/paste into Enrichr
+```{r include = TRUE, echo = TRUE}
+gene_list_to_txt_enrichr <- function(markers.df, gene_index, txt_name){
+  fx_gene_list <- markers.df[gene_index, ]
+  head(fx_gene_list)
+  
+  date <- as.Date(Sys.Date())
+  date_var <- toString(format(date, "%y%m%d"))
+  
+  setwd("~/Documents/Sandbox/Opa1-scRNAseq/Enrichr_genelist")
+  text_file <- file(paste0(date_var,txt_name,".txt"))
+  temp <- capture.output(cat(row.names(fx_gene_list), sep = "\n"))
+  writeLines(as.character(temp), text_file)
+  close(text_file)
+}
+```
+
+#     Initial analysis:
+##    Sanity check - mitochondrial reads
+      Sum total mitochondrial reads as a new metadata column
+      
+      I renamed the clusters here. I'm not sure if that will mess things up later though...
+
+```{r include = TRUE, echo = TRUE}
+
+#List of all the mitochondrial genes I want to sum the counts for
+mito_genes <-grep(rownames(Tcell_data_object@assays$RNA), pattern = "mt-", value = TRUE)
+mito_genes
+
+mito_counts <- FetchData(object = Tcell_data_object, vars = mito_genes, layer = "counts")
+head(mito_counts)
+
+mito_counts$mito_sum_total <- Matrix::rowSums(mito_counts)
+Tcell_data_object <- AddMetaData(object = Tcell_data_object, metadata = mito_counts$mito_sum_total, col.name = "mito_total_reads")
+
+#Renamed the clusters in the 'seurat_clusters' metadata column
+Tcell_data_object$seurat_clusters[Tcell_data_object$seurat_clusters =="0"] <- "Naive"
+Tcell_data_object$seurat_clusters[Tcell_data_object$seurat_clusters =="1"] <- "d5_dividing"
+Tcell_data_object$seurat_clusters[Tcell_data_object$seurat_clusters =="2"] <- "d5_G1"
+Tcell_data_object$seurat_clusters[Tcell_data_object$seurat_clusters =="3"] <- "d5_opa1_unique"
+
+#Used to reorder the X axis group
+Tcell_data_object$seurat_clusters <- factor(Tcell_data_object$seurat_clusters, levels = c("Naive","d5_G1","d5_dividing","d5_opa1_unique"))
+
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "mito_total_reads", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & ggtitle("Mitochondrial gene reads per cell") & xlab("Cluster") & ylab("Reads")
+
+```
 
 
 
