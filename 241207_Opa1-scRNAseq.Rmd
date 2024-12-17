@@ -1164,7 +1164,7 @@ saveRDS(object = Tcell_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/seurat_ob
 Tcell_data_object <- readRDS("~/Documents/Sandbox/Opa1-scRNAseq/seurat_objects/Tcell_data_obj.RDS")
 
 
-saveRDS(object = filtered_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/seurat_objects/filtered_data_object.RDS")
+#saveRDS(object = filtered_data_object, "~/Documents/Sandbox/Opa1-scRNAseq/seurat_objects/filtered_data_object.RDS")
 
 #Filtered data object load if needbe (might need to do to figure out differences between v4 and v5)
 filtered_data_object <- readRDS("~/Desktop/Opa1_scRNAseq/seurat_objects/filtered_data_object.RDS")
@@ -1224,6 +1224,222 @@ Tcell_data_object$seurat_clusters <- factor(Tcell_data_object$seurat_clusters, l
 VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "mito_total_reads", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & ggtitle("Mitochondrial gene reads per cell") & xlab("Cluster") & ylab("Reads")
 
 ```
+
+##    Sum total ribosomal reads as a new metadata column 
+      Evenutally remove from variable gene list?
+      Three gene families - Rpl-, Rps-, Mrp-
+
+```{r include = TRUE, echo = TRUE}
+
+#List of all the ribosomal (RPL, RPS, MRP, total) genes I want to sum the counts for
+mito_genes <-grep(rownames(Tcell_data_object@assays$RNA), pattern = "mt-", value = TRUE)
+rpl_genes <-grep(rownames(Tcell_data_object@assays$RNA), pattern = "Rpl", value = TRUE)
+rps_genes <-grep(rownames(Tcell_data_object@assays$RNA), pattern = "Rps", value = TRUE)
+mrp_genes <-grep(rownames(Tcell_data_object@assays$RNA), pattern = "Mrp", value = TRUE)
+all_ribosomal_genes <- c(rpl_genes, rps_genes, mrp_genes)
+
+rpl_counts <- FetchData(object = Tcell_data_object, vars = rpl_genes, layer = "counts")
+rps_counts <- FetchData(object = Tcell_data_object, vars = rps_genes, layer = "counts")
+mrp_counts <- FetchData(object = Tcell_data_object, vars = mrp_genes, layer = "counts")
+all_ribosomal_counts <- FetchData(object = Tcell_data_object, vars = all_ribosomal_genes, layer = "counts")
+
+
+rpl_counts$rpl_sum_total <- Matrix::rowSums(rpl_counts)
+rps_counts$rps_sum_total <- Matrix::rowSums(rps_counts)
+mrp_counts$mrp_sum_total <- Matrix::rowSums(mrp_counts)
+all_ribosomal_counts$all_ribosomal_sum_total <- Matrix::rowSums(all_ribosomal_counts)
+
+
+
+Tcell_data_object <- AddMetaData(object = Tcell_data_object, metadata = rpl_counts$rpl_sum_total, col.name = "rpl_total_reads")
+Tcell_data_object <- AddMetaData(object = Tcell_data_object, metadata = rps_counts$rps_sum_total, col.name = "rps_total_reads")
+Tcell_data_object <- AddMetaData(object = Tcell_data_object, metadata = mrp_counts$mrp_sum_total, col.name = "mrp_total_reads")
+Tcell_data_object <- AddMetaData(object = Tcell_data_object, metadata = all_ribosomal_counts$all_ribosomal_sum_total, col.name = "all_ribosomal_total_reads")
+
+#rpl genes
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "rpl_total_reads", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & ggtitle("Rpl- ribosomal gene reads per cell") & xlab("Cluster") & ylab("Reads")
+
+#rps genes
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "rps_total_reads", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & ggtitle("Rps- ribosomal gene reads per cell") & xlab("Cluster") & ylab("Reads")
+
+#mrp genes
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "mrp_total_reads", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & ggtitle("Mitochondrial ribosomal gene reads per cell") & xlab("Cluster") & ylab("Reads")
+
+#all ribosomal reads
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "all_ribosomal_total_reads", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, add.noise = TRUE, log = TRUE) & ggtitle("All ribosomall gene reads per cell") & xlab("Cluster") & ylab("Reads")
+
+
+rm(rpl_counts, rps_counts, mrp_counts, rpl_genes, rps_genes, mrp_genes, all_ribosomal_genes, all_ribosomal_counts)
+gc()
+
+```
+
+##    Individual genes of interest
+      CD98, Tcf1, Irf4, Eomes
+      Tfam, Pgc1a, Nrf2
+      Mfn1, Mfn2
+      Translational repressors
+      Purine synthesis
+      FAO
+      TCA cycle
+      
+      all individual vln plots. Actual pathway analysis coming later. Basically function-writing practice and these popped up at various points in reponse to question and meetings that were had.
+
+###   Plots for CD98, Tcf1, Irf4, Eomes -> have protein confirmation for these
+
+```{r include = TRUE, echo = TRUE, eval = FALSE}
+#CD98
+FeaturePlot(Tcell_data_object, features = c("Slc3a2"), split.by = "genotype")
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Slc3a2", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Slc3a2 (CD98)")
+
+#Tcf1
+FeaturePlot(Tcell_data_object, features = c("Tcf7"), split.by = "genotype")
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Tcf7", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Tcf7")
+
+#Opa1
+FeaturePlot(Tcell_data_object, features = c("Opa1"), split.by = "genotype")
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Opa1", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Opa1")
+
+#Irf4
+FeaturePlot(Tcell_data_object, features = c("Irf4"), split.by = "genotype")
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Irf4", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Irf4")
+
+#Eomes
+FeaturePlot(Tcell_data_object, features = c("Eomes"), split.by = "genotype")
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Eomes", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Eomes")
+
+```
+
+###   Mitochondrial biogenesis TFs, Mfn1, Mfn2 --> no difference
+
+```{r include = TRUE, echo = TRUE, eval = FALSE}
+#Pgc1a (Ppargc1a)
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Ppargc1a", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Pgc1a")
+
+#Nrf1
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Nrf1", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Nrf1")
+
+#Tfam
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Tfam", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Tfam")
+
+#Mfn1
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Mfn1", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Mfn1")
+
+#Mfn2
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Mfn2", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Mfn2")
+
+```
+
+###   Translational repressors
+
+```{r include = TRUE, echo = TRUE, eval = FALSE}
+
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Eif4ebp2", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Eif4ebp2")
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Pdcd4", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Pdcd4")
+#others
+VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = "Dnm1l", split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle("Drp1")
+
+```
+
+###   Purine synthesis - Vln plots
+
+```{r include = TRUE, echo = TRUE, eval = FALSE}
+purine_list <- list("Ppat","Prps1","Atic","Impdh1","Dck","Cant1","Nme1","Nme6","Pde7a","Rrm2")
+purine_vln_list = list()
+
+for (i in 1:length(purine_list)) {
+  gene <-purine_list[i]
+  print(gene)
+  vln_cluster <- VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = purine_list[[i]], split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle(purine_list[[i]])
+  purine_vln_list[[i]] <- vln_cluster
+}
+print(purine_vln_list)
+
+rm(purine_list, purine_vln_list, vln_cluster, i, gene)
+gc()
+
+```
+
+###   FAO genes - Vln plots
+
+```{r include = TRUE, echo = TRUE, eval = FALSE}
+FAO_list <- list("Acadm","Ivd","Acads","Acadl","Acadvl","Acad8","Acad9","Acad10","Acad11")
+
+FAO_vln_list = list()
+for (i in 1:length(FAO_list)) {
+  gene <-FAO_list[i]
+  print(gene)
+  vln_cluster <- VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = FAO_list[[i]], split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle(FAO_list[[i]])
+  FAO_vln_list[[i]] <- vln_cluster
+}
+print(FAO_vln_list)
+
+rm(FAO_list, FAO_vln_list, vln_cluster, i, gene)
+
+```
+
+###   TCA cycle enzymes - vln plots
+
+```{r include = TRUE, echo = TRUE, eval = FALSE}
+#TCA cycle enzymes
+TCA_list <- list("Pdhb","Sucla2","Dld","Pdhx","Suclg1","Acod1","Aco1","Aco2","Idh1","Idh3a","Idh3b","Idh3g","Sdhb","Dlat","Dlst","Sdha","Fh1","Sdhc","Ogdh","Cs","Mdh1","Mdh2","Suclg2")
+
+
+TCA_vln_list = list()
+for (i in 1:length(TCA_list)) {
+  gene <-TCA_list[i]
+  print(gene)
+  vln_cluster <- VlnPlot(Tcell_data_object, cols = c("Sky Blue", "Black"), features = TCA_list[[i]], split.by = "genotype", group.by = "seurat_clusters", pt.size = 0.05, log = TRUE, add.noise = TRUE) & xlab("Cluster") & ylab("Expression") & ggtitle(TCA_list[[i]])
+  TCA_vln_list[[i]] <- vln_cluster
+}
+
+print(TCA_vln_list)
+rm(TCA_list, TCA_vln_list, vln_cluster, i, gene)
+
+```
+
+
+##   FindAllMarkers() for the 4 clusters
+      
+```{r include = TRUE, echo = TRUE}
+#not sure what these do. This is from scott's clustering R script
+library(Seurat)
+library(tidyverse)
+library(cowplot)
+library(Matrix)
+#library(ComplexHeatmap)
+#library(writexl)
+library(RColorBrewer)
+
+
+allMarkers <- FindAllMarkers(object = Tcell_data_object,
+                             assay = "RNA",
+                             logfc.threshold = 0.25,
+                             test.use = "wilcox",
+                             only.pos = FALSE,
+                             verbose = TRUE)
+
+#pct.1 = percent of cluster that expresses the gene
+#pct.2 = percent of everything else that expresses the gene
+allMarkers %>% head()
+allMarkers %>% tail()
+
+
+```
+
+
+
+
+
+
+
+###   
+
+```{r include = TRUE, echo = TRUE, eval = FALSE}
+
+
+```
+
 
 
 
