@@ -1410,13 +1410,16 @@ library(Matrix)
 #library(ComplexHeatmap)
 #library(writexl)
 library(RColorBrewer)
+library(patchwork)
 
 
 allMarkers <- FindAllMarkers(object = Tcell_data_object,
                              assay = "RNA",
                              logfc.threshold = 0.25,
                              test.use = "wilcox",
-                             only.pos = FALSE,
+                             only.pos = TRUE,
+                             min.pct = 0.25,
+                             min.diff.pct = 0.25,
                              verbose = TRUE)
 
 #pct.1 = percent of cluster that expresses the gene
@@ -1427,6 +1430,44 @@ allMarkers %>% tail()
 
 ```
 
+
+###    Identify top defining genes per cluster
+```{r include = TRUE, echo = TRUE}
+
+top5perCluster2 <- allMarkers %>% group_by(cluster) %>% top_n(5, avg_log2FC)
+top10perCluster2 <- allMarkers %>% group_by(cluster) %>% top_n(10, avg_log2FC)
+
+
+```
+
+###    DotPlots of top defining genes
+```{r include = TRUE, echo = TRUE}
+
+DotPlot(object = Tcell_data_object, features = unique(top5perCluster2$gene)) +
+         theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+knitr::opts_chunk$set(
+  fig.width=20,
+  fig.height=10)
+
+plot <- DotPlot(object = Tcell_data_object, features = unique(top5perCluster$gene)) 
+
+plot + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme(aspect.ratio = 0.3) + theme(legend.key.size = unit(0.5, "cm")) + theme(legend.position = "bottom") + theme(legend.direction = "vertical", legend.box = "horizontal") + theme(axis.title.y = element_blank())
+
+plot + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme(aspect.ratio = 0.3) + theme(legend.key.size = unit(0.5, "cm")) + theme(legend.position = "bottom") + theme(legend.direction = "vertical")
+
+
+```
+
+###    Heatmaps
+```{r include = TRUE, echo = TRUE}
+
+#this doesn't look like scott's but I think he also removed some clusters? idk...
+DoHeatmap(Tcell_data_object, features = top5perCluster$gene, group.by = "seurat_clusters") + scale_fill_gradient2(low = "blue", mid ="lightgray", high = "red")
+DoHeatmap(Tcell_data_object, features = top5perCluster$gene, group.by = "seurat_clusters") + scale_fill_gradient2(low = "blue", mid ="lightgray", high = "red")
+DoHeatmap(Tcell_data_object, features = top10perCluster$gene, group.by = "seurat_clusters") + scale_fill_gradient2(low = "blue", mid ="lightgray", high = "red")
+
+```
 
 
 
