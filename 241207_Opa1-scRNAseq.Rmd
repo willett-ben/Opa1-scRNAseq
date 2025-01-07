@@ -1437,10 +1437,15 @@ allMarkers %>% tail()
 top5perCluster2 <- allMarkers %>% group_by(cluster) %>% top_n(5, avg_log2FC)
 top10perCluster2 <- allMarkers %>% group_by(cluster) %>% top_n(10, avg_log2FC)
 
+DoHeatmap(Tcell_data_object, features = top5perCluster2$gene, group.by = "seurat_clusters") + scale_fill_gradient2(low = "blue", mid ="white", high = "red")
+DoHeatmap(Tcell_data_object, features = top10perCluster2$gene, group.by = "seurat_clusters") + scale_fill_gradient2(low = "blue", mid ="white", high = "red")
+
 
 ```
 
 ###    DotPlots of top defining genes
+
+
 ```{r include = TRUE, echo = TRUE}
 
 DotPlot(object = Tcell_data_object, features = unique(top5perCluster2$gene)) +
@@ -1450,7 +1455,7 @@ knitr::opts_chunk$set(
   fig.width=20,
   fig.height=10)
 
-plot <- DotPlot(object = Tcell_data_object, features = unique(top5perCluster$gene)) 
+plot <- DotPlot(object = Tcell_data_object, features = unique(top5perCluster2$gene)) 
 
 plot + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme(aspect.ratio = 0.3) + theme(legend.key.size = unit(0.5, "cm")) + theme(legend.position = "bottom") + theme(legend.direction = "vertical", legend.box = "horizontal") + theme(axis.title.y = element_blank())
 
@@ -1469,8 +1474,114 @@ DoHeatmap(Tcell_data_object, features = top10perCluster$gene, group.by = "seurat
 
 ```
 
+# Tcell data object to csv for cNMF
+  I had issues downloading fast cluster from the command line. Going to try and run cNMF in R...
+
+```{r include = TRUE, echo = TRUE}
+
+library(data.table)
+
+#matrix of Cells x Genes
+opa1_matrix <- as.data.frame(as.matrix(Tcell_data_object@assays$RNA$data))
+
+#cNMF needs this data in tab-delimited text file
+write.table(opa1_matrix, file = "test.txt", col.names = TRUE, row.names = TRUE)
+
+write.table()
 
 
+```
+
+```{r}
+
+filtered_dir = '/Users/ben/Documents/Sandbox/Opa1-scRNAseq/cnmf/'
+
+counts_norm <- Tcell_data_object@assays$RNA$data
+barcodes <- colnames(counts_norm)
+gene_names <- rownames(counts_norm)
+
+# Output counts matrix
+writeMM(counts_norm, paste0(filtered_dir, 'matrix.mtx'))
+
+# Output cell barcodes
+write.table(as.data.frame(barcodes), paste0(filtered_dir, 'barcodes.tsv'),
+           col.names = FALSE, row.names = FALSE, sep = "\t")
+
+# Output feature names
+features <- data.frame("gene_id" = gene_names,"gene_name" = gene_names,type = "Gene Expression")
+write.table(as.data.frame(features), sep = "\t", paste0(filtered_dir, 'genes.tsv'),
+           col.names = FALSE, row.names = FALSE)
+```
+
+
+Now we run cnmf by passing the command line commands to the system() function
+
+First is the prepare step which normalizes the count matrix and prepares the factorization step
+
+```{r}
+
+data_dir <- "/Users/ben/Documents/Sandbox/Opa1-scRNAseq/cnmf/"
+
+runname = "example_cNMF"
+cmd = paste("cnmf prepare --output-dir", data_dir,
+            "--name", runname,
+            "-c", paste0(filtered_dir, 'matrix.mtx'),
+            "--max-nmf-iter 2000", 
+            "-k 5 6 7 8 9 10 --n-iter 20", sep=" ")
+print(cmd)
+system(cmd)
+```
+Next is the factorization step which runs NMF --n-iter times (in this case 20) for each value of K. In this tutorial we run all these jobs sequentially on a single worker but in theory this can be distributed to multiple cores or nodes with separate commands like so:
+
+cnmf factorize --output-dir ./R_Example_Data/ --name example_cNMF --worker-index 0 --total-workers 3
+cnmf factorize --output-dir ./R_Example_Data/ --name example_cNMF --worker-index 1 --total-workers 3
+cnmf factorize --output-dir ./R_Example_Data/ --name example_cNMF --worker-index 2 --total-workers 3
+
+
+
+
+
+
+
+
+
+
+
+# DE in cycling cells
+
+
+## Shared cluster: markers between WT and KO? --> average expression of all genes is basically the same here
+```{r include = TRUE, echo = TRUE}
+shared_cluster_object <- subset(Tcell_data_object, idents = c("d5_dividing", "d5_opa1_unique"))
+Idents(shared_cluster_object) <- "genotype"
+
+DimPlot(object = shared_cluster_object, dims = 1:2, reduction = "Tcell_umap", group.by = "genotype")
+
+shared_ave <- log1p(AverageExpression(shared_cluster_object, verbose = TRUE)$RNA)
+head(row.names(shared_ave))
+
+shared_ave <- as.data.frame(shared_ave)
+
+d5_shared_ave_plot <- ggplot(shared_ave, aes(wt, opa1)) + geom_point() + ggtitle("d5_shared cycling cluster")
+d5_shared_ave_plot
+
+
+proliferating_markers <- FindAllMarkers(object = shared_cluster_object,
+                             assay = "RNA",
+                             logfc.threshold = 0.25,
+                             test.use = "wilcox",
+                             only.pos = TRUE,
+                             min.pct = 0.25,
+                             min.diff.pct = 0.25,
+                             verbose = TRUE)
+
+
+dividing_top10 <- proliferating_markers %>% group_by("genotype") %>% top_n(10, avg_log2FC)
+
+DotPlot(object = shared_cluster_object, features = unique(dividing_top10$gene)) +
+         theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
 
 
 
