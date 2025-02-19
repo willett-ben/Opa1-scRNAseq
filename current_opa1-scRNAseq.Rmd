@@ -84,7 +84,7 @@ opa1_obj <- CreateSeuratObject(counts = opa1, project = "opa1")
 
 ```
 
-#     Check metadata  
+##     Check metadata  
 ```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
 
 head(wt_obj@meta.data)
@@ -238,7 +238,10 @@ ggplot(merged_data_object@meta.data, aes(x=nCount_RNA, y=nFeature_RNA, color=mit
       #Expected that the Opa1ko have even less mito chontamination than wt because the MITOCHONDRIAL GENOME IS        NOT MAINTAINED in Opa1ko cells!!
 ```{r include=TRUE, echo=TRUE, warning = FALSE}
 
-ggplot(merged_data_object@meta.data, aes(color=orig.ident, x=mitoPct, fill=orig.ident)) +
+ggplot(merged_data_object@meta.data,
+       aes(color=orig.ident,
+           x=mitoPct,
+           fill=orig.ident)) +
 geom_density(alpha = 0.2) +
 scale_x_log10() +
 theme_classic()+
@@ -259,9 +262,16 @@ ggplot(merged_data_object@meta.data, aes(x=complexity, color = orig.ident, fill=
 ##    Other plots  
       violin plots of prev data
 ```{r include=TRUE, echo=TRUE}
+features_to_plot <- c("nFeature_RNA", "nCount_RNA", "mitoPct")
 
-VlnPlot(merged_data_object, features = c("nFeature_RNA", "nCount_RNA", "mitoPct"), ncol = 3)
-VlnPlot(merged_data_object, features = c("nFeature_RNA", "nCount_RNA", "mitoPct"), stack = T)
+VlnPlot(merged_data_object,
+        features = features_to_plot,
+        ncol = 3)
+VlnPlot(merged_data_object,
+        features = features_to_plot,
+        stack = T)
+
+rm(features_to_plot)
 
 ```
 
@@ -305,10 +315,6 @@ Remove the following genes:
 
 ```{r include = TRUE, echo = TRUE}
 
-#count variable:
-#row names = gene
-#col names = cells
-
 counts <- LayerData(filtered_data_object, assay = "RNA", layer = "counts")
 
 nonzero <- counts > 0
@@ -335,11 +341,11 @@ filtered_data_object <- CreateSeuratObject(counts = filtered_counts, meta.data =
 ```
 
 
-#     Post-Filtering Data Exploration  
+#     Post-Filtering Data Examination 
 ##    Total Cells per Sample  
 ```{r include = TRUE, echo = TRUE}
 
-ggplot(filtered_data_object@meta.data, aes(x=orig.ident, fill=orig.ident)) +
+ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=orig.ident, fill=orig.ident)) +
 geom_bar() +
 theme_classic() +
 theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
@@ -359,6 +365,7 @@ ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nCount_RNA, fill=
   geom_vline(xintercept = 1000, linetype = "dashed", color = "orange", linewidth = 2)
 
 ```
+
 ##    Distribution of total number of unique genes expressed per cell  
 
 ```{r include = TRUE, echo = TRUE, warning=FALSE}
@@ -411,14 +418,15 @@ theme_classic()
 ##    Other plots  
 
 ```{r include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+features_to_plot <- c("nCount_RNA", "nFeature_RNA", "mitoPct")
 
-VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPct"), ncol = 3)
 VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPct"), stack = T)
 
+rm(features_to_plot)
 ```
 
 
-##    Managing memory and space  .   
+##    Managing variables and memory   
 
 ```{r include=TRUE, echo=TRUE}
 
@@ -434,10 +442,12 @@ gc()
 ##    Gene expression normalization  
 
 ```{r include = TRUE, echo = TRUE}
+norm.method <- "LogNormalize"
+assay <- "RNA"
 
 filtered_data_object <- NormalizeData(object = filtered_data_object,
-                                      normalization.method = "LogNormalize",
-                                      assay = "RNA")
+                                      normalization.method = norm.method,
+                                      assay = assay)
 
 #sanity check. All are floats/continuous values. The raw data is integers
 filtered_data_object@assays$RNA@layers
@@ -448,18 +458,16 @@ filtered_data_object@assays$RNA@layers
 
 ```{r include = TRUE, echo = TRUE}
 
-#cycling genes:
-cc.genes.updated.2019
+##### cycling genes: #####
+#cc.genes.updated.2019
 
 filtered_data_object <- CellCycleScoring(object = filtered_data_object,
                                          g2m.features = cc.genes.updated.2019$g2m.genes,
                                          s.features = cc.genes.updated.2019$s.genes)
-#check
-head(filtered_data_object@meta.data)
 
 ```
 
-###   Distribution of cells per phase
+##   Distribution of cells per phase
 
 ```{r include = TRUE, echo = TRUE}
 
@@ -476,7 +484,17 @@ geom_bar() +
 theme_classic() +
 theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
 theme(plot.title = element_text(hjust=0.5, face="bold"))
+
+
 ```  
+##    Managing variables and memory   
+
+```{r include=TRUE, echo=TRUE}
+
+rm(norm.method, assay)
+gc()
+
+```
 
 #     PCA 
 
@@ -484,34 +502,42 @@ theme(plot.title = element_text(hjust=0.5, face="bold"))
       Use standard 2000 most variable genes:
 
 ```{r include = TRUE, echo=TRUE}
+sel.method <- "vst"
+num.genes <- 2000
+assay <- "RNA"
+
 
 filtered_data_object <- FindVariableFeatures(object = filtered_data_object,
-                                             selection.method = "vst",
-                                             nfeatures = 2000,
+                                             selection.method = sel.method,
+                                             nfeatures = num.genes,
                                              verbose = FALSE,
-                                             assay = "RNA")
+                                             assay = assay)
 
 VariableFeatures(object = filtered_data_object,
-                 selection.method = "vst",
-                 assay = "RNA")
+                 selection.method = sel.method,
+                 assay = assay)
 
 #check that these genes are ok to be used for clustering
 variableGeneDf <- as_tibble(HVFInfo(filtered_data_object,
-                                    selection.method = "vst",
+                                    selection.method = sel.method,
                                     status = TRUE,
-                                    assay = "RNA"),
+                                    assay = assay),
                                     rownames = "Gene")
 
 variableGeneDf = variableGeneDf %>%
   mutate(hypervariable=Gene %in%
            VariableFeatures(filtered_data_object,
-                            selection.method = "vst",
-                            assay = "RNA"))
+                            selection.method = sel.method,
+                            assay = assay))
 
+#plot
 ggplot(variableGeneDf, aes(x = log(mean),
                        y = log(variance),
                        color = hypervariable)) +
                        geom_point()
+
+rm(sel.method, num.genes, assay, variableGeneDf)
+gc()
 
 ```
 
@@ -519,23 +545,34 @@ ggplot(variableGeneDf, aes(x = log(mean),
       Regress out cell cycle
 
 ```{r include = TRUE, echo = TRUE}
+assay <- "RNA"
+regress_variables <- "Phase"
+
 
 filtered_data_object <- ScaleData(object = filtered_data_object,
-                                  assay = "RNA",
-                                  vars.to.regress = "Phase")
+                                  assay = assay,
+                                  vars.to.regress = regress_variables)
+
+rm(assay, regress_variables)
+gc()
 
 ```
 
 ##    Calculate principle components 
 
 ```{r include = TRUE, echo = TRUE}
+assay <- "RNA"
+seed <- 18
+pcs_to_run <- 50
+
 
 filtered_data_object <- RunPCA(object = filtered_data_object,
-                               assay = "RNA",
-                               seed.use = 42,
-                               npcs = 50,
+                               assay = assay,
+                               seed.use = seed,
+                               npcs = pcs_to_run,
                                weight.by.var = TRUE)
 
+rm(assay, seed, pcs_to_run)
 
 ```
 
@@ -547,16 +584,34 @@ filtered_data_object <- RunPCA(object = filtered_data_object,
 
 ```{r include=TRUE, echo=TRUE}
 
-DimPlot(filtered_data_object, reduction = "pca", group.by = "Phase", order = TRUE)
-DimPlot(filtered_data_object, reduction = "pca", split.by = "Phase", order = TRUE)
-DimPlot(filtered_data_object, reduction = "pca", group.by = "orig.ident", order = TRUE)
-DimPlot(filtered_data_object, reduction = "pca", group.by = "Phase", split.by = "orig.ident", order = TRUE)
+reduction <- "pca"
+grouping <- list("Phase", NULL, "orig.ident", "Phase")
+splitting <- list(NULL, "Phase", NULL, "orig.ident")
+
+plot_list <- list()
+i <- 1
+for (pca_index in 1:4) {
+  plot <- DimPlot(object = filtered_data_object,
+                  reduction = reduction,
+                  group.by = grouping[[pca_index]],
+                  split.by = splitting[[pca_index]],
+                  order = TRUE)
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+rm(reduction, grouping, splitting, plot_list, i, pca_index, plot)
+gc()
 
 ```
 
-###   FeaturePlots
+###   FeaturePlot and heatmap
 
       *  mitchondrial percentage
+      *  heatmap of PCs and the top genes defining them
 
 ```{r include=TRUE, echo=TRUE}
 
@@ -591,17 +646,38 @@ pcs = 20
 ###   *t*-SNE  
 
 ```{r include = TRUE, echo = TRUE}
+reduction <- "pca"
+assay <- "RNA"
+seed <- 18
+ReductionName <- "initial_tsne"
+
+
+#how you want the resulting tsne plots to be grouped by:
+grouping <- c("orig.ident", "Phase")
+
 
 filtered_data_object <- RunTSNE(object = filtered_data_object,
                                 dims = 1:pcs,
-                                reduction = "pca",
-                                assay = "RNA",
-                                seed.use = 42,
-                                reduction.name = "initial_tsne")
+                                reduction = reduction,
+                                assay = assay,
+                                seed.use = seed,
+                                reduction.name = ReductionName)
 
-DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_tsne", group.by = "orig.ident")
+#dimensions for plotting
+dimensions <- 1:2
 
-DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_tsne", group.by = "Phase")
+DimPlot(object = filtered_data_object,
+        dims = dimensions,
+        reduction = ReductionName,
+        group.by = grouping[[1]])
+
+DimPlot(object = filtered_data_object,
+        dims = dimensions,
+        reduction = ReductionName,
+        group.by = grouping[[2]])
+
+rm(reduction, assay, seed, ReductionName, dimensions, grouping)
+gc()
 
 ```
 
@@ -609,20 +685,34 @@ DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_tsne", g
 
 ```{r include = TRUE, echo = TRUE}
 
+##### variables for UMAP #####
+reduction <- "pca"
+assay <- "RNA"
+seed <- 18
+ReductionName <- "initial_umap"
+
+
+
 filtered_data_object <- RunUMAP(object = filtered_data_object,
                                 dims = 1:pcs,
-                                reduction = "pca",
-                                assay = "RNA",
+                                reduction = reduction,
+                                assay = assay,
                                 n.neighbors = 30,
-                                seed.use = 18,
-                                reduction.name = "initial_umap")
+                                seed.use = seed,
+                                reduction.name = ReductionName)
 
-DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_umap", group.by = "orig.ident")
-DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_umap", group.by = "Phase")
-DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_umap", group.by = "Phase", split.by = "orig.ident")
+###### dimensions for plotting #####
+dimensions <- 1:2
+
+DimPlot(object = filtered_data_object, dims = dimensions, reduction = ReductionName, group.by = "orig.ident")
+DimPlot(object = filtered_data_object, dims = dimensions, reduction = ReductionName, group.by = "Phase")
+DimPlot(object = filtered_data_object, dims = dimensions, reduction = ReductionName, group.by = "Phase", split.by = "orig.ident")
+
+##### cleanup #####
+rm(reduction, assay, seed, ReductionName, dimensions)
+gc()
 
 ```
-
 
 #     Clustering 
 
@@ -630,20 +720,15 @@ DimPlot(object = filtered_data_object, dims = 1:2, reduction = "initial_umap", g
       --> Uses pcs variable defined earlier
 
 ```{r include=TRUE, echo=TRUE}
+reduction <- "pca"
+assay <- "RNA"
+
 
 filtered_data_object <- FindNeighbors(object = filtered_data_object,
-                                      reduction = "pca",
+                                      reduction = reduction,
                                       dims = 1:pcs,
-                                      assay = "RNA")
+                                      assay = assay)
 
-```
-
-##   Load filtered data object
-```{r include = TRUE, echo = TRUE}
-seurat_directory <- "~/Sandbox/opa1-scRNAseq-local/seurat_objects/"
-seurat_object_load <- "filtered_data_object.RDS"
-
-filtered_data_object <- readRDS(paste0(seurat_directory, seurat_object_load))
 ```
 
 ##      Select clustering resolution to test  
@@ -652,11 +737,12 @@ filtered_data_object <- readRDS(paste0(seurat_directory, seurat_object_load))
             
 ```{r include = TRUE, echo = TRUE}
 resolutions_to_test <- c(0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.6, 1.0, 1.4)
+seed <- 18
 
 filtered_data_object <- FindClusters(object = filtered_data_object,
                                      resolution = resolutions_to_test,
                                      algorithm = 1,
-                                     random.seed = 18)
+                                     random.seed = seed)
 
 plot_list <- list()
 i <-1 
@@ -677,10 +763,13 @@ for (i in 1:length(plot_list)) {
 
 ```
 ###         Resolution picked: 0.15
+            10 clusters
 
 ```{r include = TRUE, echo = TRUE}
 
 final_resolution <- "0.15"
+Idents(object = filtered_data_object) <- "RNA_snn_res.0.15"
+filtered_data_object$seurat_clusters <- filtered_data_object@active.ident
 
 #double check. Looks good.
 resolution_plots <- list("orig.ident", "Phase", NULL)
@@ -702,12 +791,51 @@ for (i in 1:length(plot_list)) {
 }
 
 ```
-###         Cleanup variables
+###         Cleanup variables and metadata
 
 ```{r include = TRUE, echo = TRUE}
-rm(grouping, i, res, final_resolution, resolutions_to_test)
+
+#delete metadata for unused clustering results
+metadata_to_delete <- list("RNA_snn_res.0.05", 
+                           "RNA_snn_res.0.1",
+                           "RNA_snn_res.0.2",
+                           "RNA_snn_res.0.25",
+                           "RNA_snn_res.0.3",
+                           "RNA_snn_res.0.4",
+                           "RNA_snn_res.0.6",
+                           "RNA_snn_res.1",
+                           "RNA_snn_res.1.0",
+                           "RNA_snn_res.1.4")
+for (metadata in metadata_to_delete) {
+  data_cat <- paste0("filtered_data_object$", metadata, " <- NULL")
+  eval(rlang::parse_expr(data_cat))
+}
+
+rm(grouping, plot_list, plot, i, res, final_resolution, resolutions_to_test, resolution_plots, metadata_to_delete, metadata, data_cat)
 gc()
 ``` 
+
+##      Save/Load filtered data object
+        pca, tsne, umap reductions have been done
+        Clustering and analysis are next
+```{r include = TRUE, echo = TRUE}
+seurat_directory <- "~/Sandbox/opa1-scRNAseq-local/seurat_objects/"
+filtered_object <- "filtered_data_object_postclustering.RDS"
+
+
+##### Save point #####
+saveRDS(object = filtered_data_object, paste0(seurat_directory, filtered_object))
+
+##### Load if needbe #####
+#filtered_data_object <- readRDS(paste0(seurat_directory, filtered_object))
+
+##### cleanup #####
+# no longer need merged data object
+
+rm(filtered_object, merged_data_object)
+gc()
+```
+
 
 #     Covariate check of clusters     
 
@@ -734,7 +862,8 @@ for (i in 1:length(plot_list)) {
   print(plot_list[[i]])
 }
 
-rm(covariate_checks, plot_list, i)
+rm(covariate_checks, covariate, plot_list, i)
+gc()
 
 ``` 
 
@@ -763,7 +892,7 @@ for (i in 1:length(plot_list)) {
   print(plot_list[[i]])
 }
 
-rm(genes_for_IDing, plot_list, i)
+rm(genes_for_IDing, gene,plot, plot_list, i)
 
 ``` 
 
@@ -810,126 +939,205 @@ table(Tcell_data_object@meta.data$Phase, Tcell_data_object@meta.data$genotype)
 
 ```
 
-##    ReRun t-SNE, UMAP, and clustering for Tcell only data
-###   PCs - still 20
+##      Save/Load Tcell_data_object
+        initial save
+        PCA, tsne, UMAP, and reclustering have not been done
+```{r include = TRUE, echo = TRUE}
+seurat_directory <- "~/Sandbox/opa1-scRNAseq-local/seurat_objects/"
+Tcell_object <- "Tcell_data_object_initial.RDS"
+
+
+##### Save point #####
+saveRDS(object = Tcell_data_object, paste0(seurat_directory, Tcell_object))
+
+##### Load if need be #####
+#Tcell_data_object <- readRDS(paste0(seurat_directory, Tcell_object))
+
+##### cleanup #####
+# no longer need filtered data object
+
+rm(Tcell_object, filtered_data_object)
+gc()
+```
+
+
+#       Tcell_data_object:
+        ReRun t-SNE, UMAP, and clustering for Tcell only data
+
+##     PCs - still 20
 ```{r include = TRUE, echo = TRUE}
 
-ElbowPlot(object = Tcell_data_object, ndims = 50, reduction = "pca")
-pcs = 20
+##### Variables for running PCA and Finding Neighbors #####
+assay <- "RNA"
+seed <- 18
+number_of_pcs <- 50
+
+
 
 Tcell_data_object <- RunPCA(object = Tcell_data_object,
-                               assay = "RNA",
-                               seed.use = 42,
-                               npcs = 50,
+                               assay = assay,
+                               seed.use = seed,
+                               npcs = number_of_pcs,
                                weight.by.var = TRUE)
+
+ElbowPlot(object = Tcell_data_object, ndims = 50, reduction = "pca")
+
+##### Still using pcs = 20 #####
+pcs <- 20
+reduction <- "pca"
 
 Tcell_data_object <- FindNeighbors(object = Tcell_data_object,
                                       reduction = "pca",
                                       dims = 1:pcs,
-                                      assay = "RNA")
+                                      assay = assay)
+
+##### clean up #####
+rm(assay, seed, number_of_pcs, reduction)
+gc()
+
 
 ```
 
-### t-SNE    
+##     t-SNE 
+
 ```{r include = TRUE, echo = TRUE}
+
+##### Variables for tsne #####
+
+reduction <- "pca"
+assay <- "RNA"
+seed <- 18
+output_reduction_name <- "Tcell_tsne"
 
 Tcell_data_object <- RunTSNE(object = Tcell_data_object,
                                 dims = 1:pcs,
-                                reduction = "pca",
-                                assay = "RNA",
-                                seed.use = 42,
-                                reduction.name = "Tcell_tsne")
+                                reduction = reduction,
+                                assay = assay,
+                                seed.use = seed,
+                                reduction.name = output_reduction_name)
 
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_tsne", group.by = "orig.ident")
+#generating tsne plots
+reduction <- "Tcell_tsne"
+groupings <- list("orig.ident", "Phase")
+dimensions <- 1:2 #standard
 
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_tsne", group.by = "Phase")
+plot_list <- list()
+i <- 1
+for (group in groupings) {
+  plot <- DimPlot(object = Tcell_data_object,
+                  dims = dimensions,
+                  reduction = reduction,
+                  group.by = group)
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+##### clean up #####
+
+rm(reduction, assay, seed, output_reduction_name, groupings, dimensions, plot_list, i, group, plot)
+gc()
+
+
 
 ```
 
-### UMAP  
+##     Run UMAP
+
+        UMAP plots:
+        1,2)    group by genotype and cell cycle phase
+        3)      group by cell cycle phase, split by genotype
+        
 ```{r include = TRUE, echo = TRUE}
+
+##### variables for running UMAP #####
+pcs <- 20
+reduction <- "pca"
+number_of_neighbors <- 30
+seed <- 18
+umap_name <- "Tcell_umap"
+
 
 Tcell_data_object <- RunUMAP(object = Tcell_data_object,
                                 dims = 1:pcs,
-                                reduction = "pca",
-                                assay = "RNA",
-                                n.neighbors = 30,
-                                seed.use = 18,
-                                reduction.name = "Tcell_umap")
+                                reduction = reduction,
+                                assay = assay,
+                                n.neighbors = number_of_neighbors,
+                                seed.use = seed,
+                                reduction.name = umap_name)
+#generating UMAP plots
+reduction <- "Tcell_umap"
+grouping <- list("orig.ident", "Phase", "Phase")
+splitting <- list(NULL, NULL, "orig.ident")
+dimensions <- 1:2 #standard
 
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "orig.ident")
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "Phase")
-DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "Phase", split.by = "orig.ident")
+plot_list <- list()
+i <- 1
+for (umap_index in 1:3) {
+  plot <- DimPlot(object = Tcell_data_object,
+                  dims = dimensions,
+                  reduction = reduction,
+                  group.by = grouping[[umap_index]],
+                  split.by = splitting[[umap_index]])
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+##### cleanup #####
+
+rm(reduction, number_of_neighbors, seed, umap_name, grouping, splitting, dimensions, umap_index, plot_list, plot, i)
+gc()
 
 ```
 
 
-##    Re-Clustering
+##      Re-Clustering T cell object
 
-###   Resolution using = 0.05 (241213)
-
-```{r include = TRUE, echo = TRUE}
-Tcell_data_object <- FindClusters(object = Tcell_data_object,
-                                     resolution = 0.05,
-                                     algorithm = 1,
-                                     random.seed = 18)
-
-
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.05",
-        split.by = "orig.ident") +
-        ggtitle("Resolution = 0.05")
-
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.05",
-        split.by = "Phase") +
-        ggtitle("Resolution = 0.05")
-
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "orig.ident",
-        split.by = "Phase") +
-        ggtitle("Resolution = 0.05")
-
-# Get number of cells per cluster and per sample of origin
-table(Tcell_data_object@meta.data$RNA_snn_res.0.05, Tcell_data_object@meta.data$orig.ident)
-
-Idents(object = Tcell_data_object) <- "RNA_snn_res.0.05"
-```
-
-###   Other resolutions tested
-
+###    Clustering Tcell_data_object
+        resolutions tested: 0.05, 0.075, 0.1, 0.15, 0.2, 0.3
+        
+        0.075 used moving forward. Gives us 4 clusters to work with again.
 ```{r include = TRUE, echo = TRUE}
 
-pcs <- 20
+##### FindNeighbors and FindClusters variables: #####
+reduction <- "pca"
+assay <- "RNA"
 
-#clustering
+resolutions_to_test <-c(0.05, 0.075, 0.1, 0.15, 0.2, 0.3)
+seed <- 18
+algo.num <- 1 #original Louvain algorithm
+
+
+
+#####################
+#####Clustering#####
+#####################
+
 Tcell_data_object <- FindNeighbors(object = Tcell_data_object,
-                                      reduction = "pca",
+                                      reduction = reduction,
                                       dims = 1:pcs,
-                                      assay = "RNA")
+                                      assay = assay)
 
-
-resolutions_to_test <- c(0.05, 0.1,0.15, 0.2,0.225, 0.25,0.275, 0.3, 0.4)
 
 Tcell_data_object <- FindClusters(object = Tcell_data_object,
                                      resolution = resolutions_to_test,
-                                     algorithm = 1,
-                                     random.seed = 18)
+                                     algorithm = algo.num,
+                                     random.seed = seed)
 
+###### Reduction needed for plotting #####
+reduction <- "Tcell_umap"
+
+#Plotting clustering results
 plot_list <- list()
 i <-1 
 for (res in resolutions_to_test) {
   plot <-   DimPlot(object = Tcell_data_object,
-              reduction = "initial_umap",
+              reduction = reduction,
               label = FALSE,
               label.size = 6,
               group.by = paste0("RNA_snn_res.", res),
@@ -942,39 +1150,95 @@ for (i in 1:length(plot_list)) {
   print(plot_list[[i]])
 }
 
+#set active ident to correct resolution
+Idents(object = Tcell_data_object) <- "RNA_snn_res.0.075"
 
-Tcell_resolutions <- 0.1
 
-#NOTE: Moving forward, after some troubleshooting and analyses downstream of higher resolutions. Choosing resolution 0.1. To get 4 clusters. Two clusters are in G1 and two clusters are dividing.
+#cleanup variables
+rm(resolutions_to_test, seed, algo.num, reduction, plot_list, plot, i, res, metadata_to_delete)
+gc()
+
+```
+
+###    Visual check of new clustering
+        Looks good
+```{r include = TRUE, echo = TRUE}
+
+##### VARIABLES ######
+
+dimensions <- 1:2 #standard
+reduction <- "Tcell_umap"
+coloring <- list(c("Sky Blue", "Black"), NULL, NULL)
+
+grouping <- list("orig.ident", "RNA_snn_res.0.075", "Phase")
+splitting <- list(NULL, NULL, "orig.ident")
+
+
+plot_list <- list()
+i <- 1
+for (umap_index in 1:3) {
+  plot <- DimPlot(object = Tcell_data_object,
+                  dims = dimensions,
+                  cols = coloring[[umap_index]],
+                  reduction = reduction,
+                  group.by = grouping[[umap_index]],
+                  split.by = splitting[[umap_index]])
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+rm(dimensions, reduction, coloring, grouping, splitting, plot_list, plot, i, umap_index)
+gc()
+
 
 ```
 
 
 
-##    T cell UMAP if needed
+
+###   Set active ident and seurat_clusters to 0.075 
+
+      Clean up Tcell_data_object metadata:
+      remove resolutions 0.05, 0.1, 0.15, 0.2, 0.3
+      remove singlets/doublets metadata
 ```{r include = TRUE, echo = TRUE}
 
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.1",
-        split.by = "orig.ident") +
-        ggtitle("Resolution = 0.1")
+Idents(object = Tcell_data_object) <- "RNA_snn_res.0.075"
+Tcell_data_object$seurat_clusters <- Tcell_data_object@active.ident
 
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        group.by = "Phase",
-        split.by = "orig.ident", cols = c("gray", "orange", "#009E73")) + 
-        theme(strip.text.x = element_text(size = 20, face = "bold") ) +
-        ggtitle("") + xlab("Tcell UMAP 1") + ylab("Tcell UMAP 2")
+
+#delete metadata for unused clustering results
+metadata_to_delete <- list("RNA_snn_res.0.05", 
+                           "RNA_snn_res.0.1",
+                           "RNA_snn_res.0.15",
+                           "RNA_snn_res.0.2",
+                           "RNA_snn_res.0.3",
+                           "scDblFinder.class",
+                           "scDblFinder.weighted",
+                           "scDblFinder.score",
+                           "scDblFinder.sample",
+                           "scDblFinder.cxds_score"
+                           )
+for (metadata in metadata_to_delete) {
+  data_cat <- paste0("Tcell_data_object$", metadata, " <- NULL")
+  eval(rlang::parse_expr(data_cat))
+}
+
+#set active ident to correct resolution
+Idents(object = Tcell_data_object) <- "RNA_snn_res.0.075"
+
+rm(metadata_to_delete, metadata, data_cat)
+gc()
 
 ```
 
 
 #     T Cell cluster wrangling
-          Resolution = 0.05 (This has been 0.1 before. Looking for 4 total clusters: naive and 3 activated. 2 G1 clusters, 2                    dividing)
+          Resolution = 0.0075 (This has also been 0.1 before. Looking for 4 total clusters: 
+          1 naive and 3 activated clusters. 2 clusters are G1, 2 clusters are S/G2M)
 ##   Identify Naive T cell cluster based on Lef1 and Tcf7 expression.
 ```{r include = TRUE, echo = TRUE}
 
@@ -993,7 +1257,8 @@ FeaturePlot(object = Tcell_data_object,
 ```
 
 
-##    Label cells as Naive and activated. Made new seurat objects to do this (probably an easier way?). Recombined and replaced           Tcell_data_object
+##    Label cells as Naive and activated. Made new seurat objects to do this (probably an easier way?).
+      Recombined and replaced           Tcell_data_object
       Can save Naive and activated groups of cells as RDS files, if wanted for some type of analysis that way.
 
 ```{r include = TRUE, echo = TRUE}
@@ -1062,6 +1327,9 @@ for (metadata in metadata_to_delete) {
 
 #good to check. Other metadata columns look good
 Tcell_data_object
+
+rm(metadata_to_delete)
+gc()
 
 ```
 
@@ -1179,80 +1447,22 @@ DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.
 ```
 
 
-##      Re-Clustering T cell object
-###     Resolution using = 0.1
-```{r include = TRUE, echo = TRUE}
-Tcell_data_object <- FindNeighbors(object = Tcell_data_object,
-                                      reduction = "pca",
-                                      dims = 1:pcs,
-                                      assay = "RNA")
 
-Tcell_data_object <- FindClusters(object = Tcell_data_object,
-                                     resolution = 0.1,
-                                     algorithm = 1,
-                                     random.seed = 18)
-#
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        cols = c("Sky Blue", "Black"),
-        label = FALSE,
-        label.size = 6,
-        group.by = "orig.ident") +
-        ggtitle("")
 
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.1") +
-        ggtitle("")
 
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "Phase",
-        split.by = "orig.ident") +
-        ggtitle("Cell cycle phase by genotype")
 
-# Get number of cells per cluster and per sample of origin
-table(Tcell_data_object@meta.data$RNA_snn_res.0.1, Tcell_data_object@meta.data$orig.ident)
 
-Idents(object = Tcell_data_object) <- "RNA_snn_res.0.1"
-```
-####    Other resolutions tested (0.15 0.2 0.25)
-```{r include = TRUE, echo = TRUE}
 
-Tcell_data_object <- FindClusters(object = Tcell_data_object,
-                                     resolution = c(0.1, 0.15, 0.2,0.3),
-                                     algorithm = 1,
-                                     random.seed = 18)
 
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.1",
-        split.by = "orig.ident") +
-        ggtitle("Resolution = 0.1")
 
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.15",
-        split.by = "orig.ident") +
-        ggtitle("Resolution = 0.15")
 
-DimPlot(object = Tcell_data_object,
-        reduction = "Tcell_umap",
-        label = FALSE,
-        label.size = 6,
-        group.by = "RNA_snn_res.0.3",
-        split.by = "orig.ident") +
-        ggtitle("Resolution = 0.3")
 
-```
+
+
+
+
+
+
 
 ##    Renaming T cell clusters (4 of them)
 
