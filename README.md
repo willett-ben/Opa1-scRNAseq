@@ -1,5 +1,5 @@
 # Opa1-scRNAseq
-scRNAseq analysis included in Willett et al. 2024
+scRNAseq analysis included in Willett et al. 2025 (in review at Cell Reports)
 
 
 First project I'm putting into Github so things aren't as efficient or streamlined as I would like them to be. Will keep working on that.
@@ -39,3 +39,19 @@ General process:
     - d5_g1 (WT + KO)
     - d5_opaq_unique (KO only, dividing cells)
 14) Cleanup seurat object metadata
+15) Analysis:
+    6A) activated vs naive
+    6B) WT vs OPA1-/-
+    6C) Clustering, split by genotype
+    6D) makeup of each cluster (WT vs KO)
+    6E) Cell cycle phase, split by genotype
+    6F) Cell counts per cluster, colored by cell cycle phase
+    6G) GEPs identified by cNMF, split by genotype
+    6H) makeup of each GEP (WT vs KO)
+    6I-J) Cell counts per GEP, split by genotype
+
+    S5A) expression patterns of Tcell-relevant genes by clusters
+    S5C) module score for hallmark Myc1 and Myc2 genesets (combined)
+    
+    
+    
