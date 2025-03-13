@@ -1,12 +1,11 @@
 # Opa1-scRNAseq
 scRNAseq analysis included in Willett et al. 2025 (in review at Cell Reports)
 
-
-First project I'm putting into Github so things aren't as efficient or streamlined as I would like them to be. Will keep working on that.
-
 Experimental details:
 WT and Opa1-/- OT1 CD8 T cells
 Two groups: naive and activated cells isolated from mice five days after LM.Ova.ActA challenge. All groups are splenocytes.
+
+cNMF analysis according to Kotliar, et al. 2019 eLife
 
 General process:
 1) Read in data, add relevant metadata, merge into single seurat object
