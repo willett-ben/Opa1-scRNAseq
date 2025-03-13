@@ -1,0 +1,1863 @@
+---
+title: "BW2310 Opa1 scRNAseq d5"
+author: "Ben Willett"
+date: "250217"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    code_folding: hide
+---
+
+
+##    Notes:
+- Regress out cell cycle at the beggining
+- Cluster and remove contaminates
+- Split naive and activated CD8s. Label in metadata
+- Recombine objects so I can show violin plots for naive and activated cells
+- I needed to redo the FindVariableFeatures(), scaling, etc. after I added the 'naive' and 'activated' labels to my cells
+  
+#     Install/Load packages (STEP 0)
+This section is always required.  You will load all packages necessary for the scope of the assignment in between the code blocks.  
+
+```{r, include =TRUE, echo=TRUE, message = FALSE}
+# load packages here
+library(SingleCellExperiment) #done
+library(Seurat) #done
+library(tidyverse) #done
+library(Matrix) #done
+library(scales) #done
+library(cowplot) #done
+library(RCurl) #done
+library(AnnotationHub) #done
+library(AnnotationFilter) #done
+library(AnnotationDbi) #done
+library(ensembldb) #done
+library(SeuratWrappers) #done
+library(harmony) #done
+library(ggpubr) #done
+library(gridExtra) #done
+library(metap) #done
+library(VISION) #done
+library(clusterProfiler) #done
+library(ggsci) #done
+#library(lisi) #no but I don't think I need it
+library(MetBrewer) #done
+library(wesanderson) #done
+library(scDblFinder) #done
+
+#for later pathway analysis (taken from SBT's code)
+library(readxl)
+library(org.Mm.eg.db)
+library(patchwork)
+library(writexl)
+library(fgsea)
+
+#cNMF
+library(readr)
+library(dplyr)
+
+#gsea heatmaps
+library(RColorBrewer)
+library(pheatmap)
+
+```
+
+#     Read in Data 
+
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+#path to 10X data
+opa1_directory <- "~/Sandbox/opa1-scRNAseq-local/10X_data/opa1/10X_files"
+wt_directory <-"~/Sandbox/opa1-scRNAseq-local/10X_data/wt/10X_files"
+
+opa1 <- Read10X(data.dir = opa1_directory, unique.features = TRUE, strip.suffix = TRUE)
+wt <- Read10X(data.dir = wt_directory, unique.features = TRUE, strip.suffix = TRUE)
+```
+
+#     Generate Seurat Objects
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+
+wt_obj <- CreateSeuratObject(counts = wt, project = "wt")
+opa1_obj <- CreateSeuratObject(counts = opa1, project = "opa1")
+
+```
+
+##     Check metadata  
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+
+head(wt_obj@meta.data)
+tail(wt_obj@meta.data)
+
+head(opa1_obj@meta.data)
+tail(opa1_obj@meta.data)
+
+dim(wt_obj@meta.data) #7500 cells in WT sample
+dim(opa1_obj@meta.data) #6700 cells in Opa1 sample
+
+#confirm row names = gene names
+row.names(wt_obj@assays$RNA)
+row.names(opa1_obj@assays$RNA) 
+
+#confirm col names = cell barcodes
+colnames(wt_obj@assays$RNA) 
+colnames(opa1_obj@assays$RNA)
+
+```
+
+      Total reads across cells
+
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+sum(wt_obj@meta.data$nCount_RNA)
+sum(opa1_obj@meta.data$nCount_RNA)
+```
+
+#     Add sample specific metadata
+##    Add genotype id 
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+
+wt_obj <- AddMetaData(wt_obj, metadata = "wt", col.name = "genotype")
+opa1_obj <- AddMetaData(opa1_obj, metadata = "opa1", col.name = "genotype")
+
+```
+
+#     Merge Data
+```{r include=TRUE, echo=TRUE, warning = FALSE, message = FALSE}
+
+merged_data_object <- merge(x = wt_obj,
+                            y = opa1_obj,
+                            add.cell.id = c("wt", "opa1"))
+
+merged_data_object <- JoinLayers(merged_data_object)
+
+```
+
+##    Confirm merge success  
+
+```{r include = TRUE, echo = TRUE}
+
+head(merged_data_object@meta.data)
+tail(merged_data_object@meta.data)
+
+#confirm same cell numbers from individual wt/opa1 seurat objects
+table(merged_data_object@meta.data$orig.ident)
+
+```
+
+#     Managing memory and space - post merge
+```{r include=TRUE, echo=TRUE}
+rm(wt, wt_obj, opa1, opa1_obj, wt_directory, opa1_directory)
+gc()
+```
+
+#     Data Setup and Formatting 
+## Calculating per cell complexity, add to metadata 
+```{r include = TRUE, echo = TRUE}
+
+merged_data_object <- AddMetaData(object = merged_data_object,
+                                  metadata = log10(merged_data_object$nFeature_RNA)/log10(merged_data_object$nCount_RNA),col.name = "complexity")
+
+```
+
+## Calculating mitochondrial read percentage per cell and adding this to the metadata  
+```{r include = TRUE, echo = TRUE}
+
+#"mt-" is the identifier for mitochondrial genes in this set
+grep(rownames(merged_data_object@assays$RNA), pattern = "mt-", value = TRUE)
+
+
+#Adding mitoPct to the metadata 
+merged_data_object$mitoPct <- PercentageFeatureSet(object = merged_data_object, pattern = "mt-")
+
+```
+
+#     Initial Data Exploration 
+##    Total Cells per Sample  
+```{r include = TRUE, echo = TRUE}
+
+ggplot(merged_data_object@meta.data, aes(x=orig.ident, fill=orig.ident)) +
+geom_bar() +
+theme_classic() +
+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+theme(plot.title = element_text(hjust=0.5, face="bold")) +
+ggtitle("Number of Cells Per Sample (raw)")
+
+```
+
+##    Distribution of total number of reads per cell  
+```{r include = TRUE, echo = TRUE}
+
+ggplot(merged_data_object@meta.data, aes(color=orig.ident, x=nCount_RNA, fill= orig.ident)) +
+geom_density(alpha = 0.2) +
+scale_x_log10() +
+theme_classic() +
+ylab("Cell density") +
+ggtitle("Distribution of reads per cell across samples")
+
+```
+
+##    Distribution of total number of unique genes expressed per cell  
+```{r include = TRUE, echo = TRUE}
+
+ggplot(merged_data_object@meta.data, aes(color=orig.ident, x=nFeature_RNA, fill= orig.ident)) +
+ geom_density(alpha = 0.2) +
+ theme_classic() +
+ scale_x_log10() +
+ggtitle("Distribution of total unique genes per cell across samples")
+
+#Boxplot
+
+ggplot(merged_data_object@meta.data, aes(x=orig.ident, y=log10(nFeature_RNA), fill=orig.ident)) +
+geom_boxplot() +
+theme_classic() +
+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+theme(plot.title = element_text(hjust=0.5, face="bold")) +
+ggtitle("Distribution of unique genes expressed per cell (raw)")
+
+
+```
+
+##    Joint plot of reads, genes, and mitochondrial percentage  
+```{r include = TRUE, echo = FALSE, message = FALSE, warning=FALSE}
+
+ggplot(merged_data_object@meta.data, aes(x=nCount_RNA, y=nFeature_RNA, color=mitoPct)) +
+   geom_point() +
+   scale_colour_gradient(low = "gray90", high = "black") +
+   stat_smooth(method=lm) +
+   scale_x_log10() +
+   scale_y_log10() +
+   theme_classic() +
+   facet_wrap(~orig.ident)
+
+```
+
+
+##    Distribution of mitochondrial percent per cell  
+
+      #Expected that the Opa1ko have even less mito chontamination than wt because the MITOCHONDRIAL GENOME IS        NOT MAINTAINED in Opa1ko cells!!
+```{r include=TRUE, echo=TRUE, warning = FALSE}
+
+ggplot(merged_data_object@meta.data,
+       aes(color=orig.ident,
+           x=mitoPct,
+           fill=orig.ident)) +
+geom_density(alpha = 0.2) +
+scale_x_log10() +
+theme_classic()+
+ggtitle("Distribution of mitochondrial contamination per cell across samples")
+
+```
+
+##    Distribution of library complexity per cell
+```{r include=TRUE, echo=TRUE}
+
+ggplot(merged_data_object@meta.data, aes(x=complexity, color = orig.ident, fill=orig.ident)) +
+        geom_density(alpha = 0.2) +
+        theme_classic() + 
+  ggtitle("Distribution of complexity across samples")
+
+```
+
+##    Other plots  
+      violin plots of prev data
+```{r include=TRUE, echo=TRUE}
+features_to_plot <- c("nFeature_RNA", "nCount_RNA", "mitoPct")
+
+VlnPlot(merged_data_object,
+        features = features_to_plot,
+        ncol = 3)
+VlnPlot(merged_data_object,
+        features = features_to_plot,
+        stack = T)
+
+rm(features_to_plot)
+
+```
+
+#     Filtering 
+##    Cell-Level filtering
+
+* keep cells with at least 200 unique genes present per cell  
+* keep cells with at 1000 reads present per cell  
+* keep cells that have a mitochondrial contamination percent of less than 20%  
+* keep cell with a complexity of greater than 80%  
+
+
+```{r include = TRUE, echo = TRUE}
+
+filtered_data_object <- subset(x = merged_data_object,
+                               subset = 
+                                 (nFeature_RNA >= 2000) &
+                                 (nCount_RNA >= 8500) &
+                                 (mitoPct < 10) &
+                                 (complexity > 0.75))
+```
+
+* The total number of cells before filtering  
+* The total number of cell after filtering  
+
+```{r include = TRUE, echo = TRUE}
+
+paste("The number of cells prior to filtering:")
+dim(merged_data_object@meta.data)[1]
+
+paste("The number of cells after filtering:")
+dim(filtered_data_object@meta.data)[1]
+
+```
+
+##    Gene-Level filtering  
+
+Remove the following genes:
+* that have 0 counts across all cells  
+* not present in at least 10 cells  
+
+```{r include = TRUE, echo = TRUE}
+
+counts <- LayerData(filtered_data_object, assay = "RNA", layer = "counts")
+
+nonzero <- counts > 0
+nonzero
+
+#filter out everything with less than 10 reads across all cells
+less_10 <- Matrix::rowSums(nonzero) >= 10
+less_10_matrix <- counts[less_10,]
+
+#Using 10 as cutoff
+keep_genes <- Matrix::rowSums(nonzero) >= 10
+filtered_counts <- counts[keep_genes, ]
+head(filtered_counts)
+
+#32285 genes prior to filtering
+dim(filtered_data_object@assays$RNA@features)
+
+#13752 genes have been removed via this filtering
+#less_10_matrix is the genes that remain after filtering. so ~18k genes remain after filtering
+print(dim(filtered_data_object@assays$RNA@features)[1] - dim(less_10_matrix)[1])
+
+
+filtered_data_object <- CreateSeuratObject(counts = filtered_counts, meta.data = filtered_data_object@meta.data)
+```
+
+
+#     Post-Filtering Data Examination 
+##    Total Cells per Sample  
+```{r include = TRUE, echo = TRUE}
+
+ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=orig.ident, fill=orig.ident)) +
+geom_bar() +
+theme_classic() +
+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+theme(plot.title = element_text(hjust=0.5, face="bold"))
+
+```
+ 
+##    Distribution of total number of reads per cell  
+
+```{r include = TRUE, echo = TRUE}
+
+ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nCount_RNA, fill= orig.ident)) +
+  geom_density(alpha = 0.2) +
+  scale_x_log10() +
+  theme_classic() +
+  ylab("Cell density") +
+  geom_vline(xintercept = 1000, linetype = "dashed", color = "orange", linewidth = 2)
+
+```
+
+##    Distribution of total number of unique genes expressed per cell  
+
+```{r include = TRUE, echo = TRUE, warning=FALSE}
+
+ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=nFeature_RNA, fill= orig.ident)) +
+  geom_density(alpha = 0.2) +
+  scale_x_log10() +
+  theme_classic() +
+  ylab("Cell density")
+
+```
+
+##    Joint plot of reads, genes, and mitochondrial percentage  
+
+```{r include = TRUE, echo = TRUE, warning=FALSE, message=FALSE}
+
+ggplot(filtered_data_object@meta.data, aes(x=nCount_RNA, y=nFeature_RNA, color=mitoPct)) +
+   geom_point() +
+   scale_colour_gradient(low = "gray90", high = "black") +
+   stat_smooth(method=lm) + #throws in linear model line (blue line)
+   scale_x_log10() +
+   scale_y_log10() +
+   theme_classic() +
+   facet_wrap(~orig.ident)
+
+```
+
+##    Distribution of mitochondrial percent per cell  
+
+```{r include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+
+ggplot(filtered_data_object@meta.data, aes(color=orig.ident, x=mitoPct, fill=orig.ident)) +
+geom_density(alpha = 0.2) +
+scale_x_log10() +
+theme_classic() +
+geom_vline(xintercept = 20, linetype = "dashed", color = "orange", linewidth = 2)
+
+```
+
+##    Distribution of library complexity per cell  
+
+```{r include=TRUE, echo=TRUE}
+
+ggplot(filtered_data_object@meta.data, aes(x=complexity, color=orig.ident, fill=orig.ident)) +
+        geom_density(alpha = 0.2) +
+theme_classic()
+
+```
+
+##    Other plots  
+
+```{r include=TRUE, echo=TRUE, message=FALSE, warning=FALSE}
+features_to_plot <- c("nCount_RNA", "nFeature_RNA", "mitoPct")
+
+VlnPlot(filtered_data_object, features = c("nCount_RNA", "nFeature_RNA", "mitoPct"), stack = T)
+
+rm(features_to_plot)
+```
+
+
+##    Managing variables and memory   
+
+```{r include=TRUE, echo=TRUE}
+
+#going to keep the merged_data_object in case I need to go back and refilter things
+rm(nonzero, keep_genes, counts, filtered_counts, less_10_matrix, less_10)
+gc()
+
+```
+
+#     Normalization and gene score calculations   
+      Now that we have visually identified some cell-level thresholds  
+
+##    Gene expression normalization  
+
+```{r include = TRUE, echo = TRUE}
+norm.method <- "LogNormalize"
+assay <- "RNA"
+
+filtered_data_object <- NormalizeData(object = filtered_data_object,
+                                      normalization.method = norm.method,
+                                      assay = assay)
+
+#sanity check. All are floats/continuous values. The raw data is integers
+filtered_data_object@assays$RNA@layers
+
+```
+
+## Calculate cell cycling scores    
+
+```{r include = TRUE, echo = TRUE}
+
+##### cycling genes: #####
+#cc.genes.updated.2019
+
+filtered_data_object <- CellCycleScoring(object = filtered_data_object,
+                                         g2m.features = cc.genes.updated.2019$g2m.genes,
+                                         s.features = cc.genes.updated.2019$s.genes)
+
+```
+
+##   Distribution of cells per phase
+
+```{r include = TRUE, echo = TRUE}
+
+#X is phase
+ggplot(filtered_data_object@meta.data, aes(x=Phase, fill=orig.ident)) +
+geom_bar() +
+theme_classic() +
+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+theme(plot.title = element_text(hjust=0.5, face="bold"))
+
+#X is genotype
+ggplot(filtered_data_object@meta.data, aes(x=orig.ident, fill=Phase)) +
+geom_bar() +
+theme_classic() +
+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+theme(plot.title = element_text(hjust=0.5, face="bold"))
+
+
+```  
+##    Managing variables and memory   
+
+```{r include=TRUE, echo=TRUE}
+
+rm(norm.method, assay)
+gc()
+
+```
+
+#     PCA 
+
+##    Identify most variable genes  
+      Use standard 2000 most variable genes:
+
+```{r include = TRUE, echo=TRUE}
+sel.method <- "vst"
+num.genes <- 2000
+assay <- "RNA"
+
+
+filtered_data_object <- FindVariableFeatures(object = filtered_data_object,
+                                             selection.method = sel.method,
+                                             nfeatures = num.genes,
+                                             verbose = FALSE,
+                                             assay = assay)
+
+VariableFeatures(object = filtered_data_object,
+                 selection.method = sel.method,
+                 assay = assay)
+
+#check that these genes are ok to be used for clustering
+variableGeneDf <- as_tibble(HVFInfo(filtered_data_object,
+                                    selection.method = sel.method,
+                                    status = TRUE,
+                                    assay = assay),
+                                    rownames = "Gene")
+
+variableGeneDf = variableGeneDf %>%
+  mutate(hypervariable=Gene %in%
+           VariableFeatures(filtered_data_object,
+                            selection.method = sel.method,
+                            assay = assay))
+
+#plot
+ggplot(variableGeneDf, aes(x = log(mean),
+                       y = log(variance),
+                       color = hypervariable)) +
+                       geom_point()
+
+rm(sel.method, num.genes, assay, variableGeneDf)
+gc()
+
+```
+
+##    Scale the data 
+      Regress out cell cycle
+
+```{r include = TRUE, echo = TRUE}
+assay <- "RNA"
+regress_variables <- "Phase"
+
+
+filtered_data_object <- ScaleData(object = filtered_data_object,
+                                  assay = assay,
+                                  vars.to.regress = regress_variables)
+
+rm(assay, regress_variables)
+gc()
+
+```
+
+##    Calculate principle components 
+
+```{r include = TRUE, echo = TRUE}
+assay <- "RNA"
+seed <- 18
+pcs_to_run <- 50
+
+
+filtered_data_object <- RunPCA(object = filtered_data_object,
+                               assay = assay,
+                               seed.use = seed,
+                               npcs = pcs_to_run,
+                               weight.by.var = TRUE)
+
+rm(assay, seed, pcs_to_run)
+
+```
+
+##    Visualizing of principle components  
+###   Dim Plots
+      * Phase  
+      * stimulation_status  
+      * orig.ident  
+
+```{r include=TRUE, echo=TRUE}
+
+reduction <- "pca"
+grouping <- list("Phase", NULL, "orig.ident", "Phase")
+splitting <- list(NULL, "Phase", NULL, "orig.ident")
+
+plot_list <- list()
+i <- 1
+for (pca_index in 1:4) {
+  plot <- DimPlot(object = filtered_data_object,
+                  reduction = reduction,
+                  group.by = grouping[[pca_index]],
+                  split.by = splitting[[pca_index]],
+                  order = TRUE)
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+rm(reduction, grouping, splitting, plot_list, i, pca_index, plot)
+gc()
+
+```
+
+###   FeaturePlot and heatmap
+
+      *  mitchondrial percentage
+      *  heatmap of PCs and the top genes defining them
+
+```{r include=TRUE, echo=TRUE}
+
+FeaturePlot(object = filtered_data_object,
+            reduction = "pca",
+            features = "mitoPct",
+            split.by = "orig.ident",
+            order = TRUE)
+
+DimHeatmap(object = filtered_data_object,
+           dims = 1:9,
+           cells = 500,
+           balanced = TRUE,
+           assays = "RNA",
+           reduction = "pca"
+           )
+
+```
+
+###   Elbow Plot  
+
+    Decide how many PCs to use.
+    Using 20
+
+```{r include = TRUE, echo = TRUE}
+
+ElbowPlot(object = filtered_data_object, ndims = 50, reduction = "pca")
+pcs = 20
+
+```
+
+###   *t*-SNE  
+
+```{r include = TRUE, echo = TRUE}
+reduction <- "pca"
+assay <- "RNA"
+seed <- 18
+ReductionName <- "initial_tsne"
+
+
+#how you want the resulting tsne plots to be grouped by:
+grouping <- c("orig.ident", "Phase")
+
+
+filtered_data_object <- RunTSNE(object = filtered_data_object,
+                                dims = 1:pcs,
+                                reduction = reduction,
+                                assay = assay,
+                                seed.use = seed,
+                                reduction.name = ReductionName)
+
+#dimensions for plotting
+dimensions <- 1:2
+
+DimPlot(object = filtered_data_object,
+        dims = dimensions,
+        reduction = ReductionName,
+        group.by = grouping[[1]])
+
+DimPlot(object = filtered_data_object,
+        dims = dimensions,
+        reduction = ReductionName,
+        group.by = grouping[[2]])
+
+rm(reduction, assay, seed, ReductionName, dimensions, grouping)
+gc()
+
+```
+
+### UMAP  
+
+```{r include = TRUE, echo = TRUE}
+
+##### variables for UMAP #####
+reduction <- "pca"
+assay <- "RNA"
+seed <- 18
+ReductionName <- "initial_umap"
+
+
+
+filtered_data_object <- RunUMAP(object = filtered_data_object,
+                                dims = 1:pcs,
+                                reduction = reduction,
+                                assay = assay,
+                                n.neighbors = 30,
+                                seed.use = seed,
+                                reduction.name = ReductionName)
+
+###### dimensions for plotting #####
+dimensions <- 1:2
+
+DimPlot(object = filtered_data_object, dims = dimensions, reduction = ReductionName, group.by = "orig.ident")
+DimPlot(object = filtered_data_object, dims = dimensions, reduction = ReductionName, group.by = "Phase")
+DimPlot(object = filtered_data_object, dims = dimensions, reduction = ReductionName, group.by = "Phase", split.by = "orig.ident")
+
+##### cleanup #####
+rm(reduction, assay, seed, ReductionName, dimensions)
+gc()
+
+```
+
+#     Clustering 
+
+##    Find cell neighbors
+      --> Uses pcs variable defined earlier
+
+```{r include=TRUE, echo=TRUE}
+reduction <- "pca"
+assay <- "RNA"
+
+
+filtered_data_object <- FindNeighbors(object = filtered_data_object,
+                                      reduction = reduction,
+                                      dims = 1:pcs,
+                                      assay = assay)
+
+```
+
+##      Select clustering resolution to test  
+###         Resolutions tested:
+            0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.6, 1.0, 1.4
+            
+```{r include = TRUE, echo = TRUE}
+resolutions_to_test <- c(0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.6, 1.0, 1.4)
+seed <- 18
+
+filtered_data_object <- FindClusters(object = filtered_data_object,
+                                     resolution = resolutions_to_test,
+                                     algorithm = 1,
+                                     random.seed = seed)
+
+plot_list <- list()
+i <-1 
+for (res in resolutions_to_test) {
+  plot <-   DimPlot(object = filtered_data_object,
+              reduction = "initial_umap",
+              label = FALSE,
+              label.size = 6,
+              group.by = paste0("RNA_snn_res.", res),
+              split.by = "orig.ident") +
+              ggtitle(paste0("Res = ", res))
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+```
+###         Resolution picked: 0.15
+            10 clusters
+
+```{r include = TRUE, echo = TRUE}
+
+final_resolution <- "0.15"
+Idents(object = filtered_data_object) <- "RNA_snn_res.0.15"
+filtered_data_object$seurat_clusters <- filtered_data_object@active.ident
+
+#double check. Looks good.
+resolution_plots <- list("orig.ident", "Phase", NULL)
+plot_list <- list()
+i <- 1
+for (grouping in resolution_plots) {
+  plot <-   DimPlot(object = filtered_data_object,
+              reduction = "initial_umap",
+              label = FALSE,
+              label.size = 6,
+              group.by = paste0("RNA_snn_res.", final_resolution),
+              split.by = grouping) +
+              ggtitle(paste0("Res = ", final_resolution, " (Resolution chosen)"))
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+```
+###         Cleanup variables and metadata
+
+```{r include = TRUE, echo = TRUE}
+
+#delete metadata for unused clustering results
+metadata_to_delete <- list("RNA_snn_res.0.05", 
+                           "RNA_snn_res.0.1",
+                           "RNA_snn_res.0.2",
+                           "RNA_snn_res.0.25",
+                           "RNA_snn_res.0.3",
+                           "RNA_snn_res.0.4",
+                           "RNA_snn_res.0.6",
+                           "RNA_snn_res.1",
+                           "RNA_snn_res.1.0",
+                           "RNA_snn_res.1.4")
+for (metadata in metadata_to_delete) {
+  data_cat <- paste0("filtered_data_object$", metadata, " <- NULL")
+  eval(rlang::parse_expr(data_cat))
+}
+
+rm(grouping, plot_list, plot, i, res, final_resolution, resolutions_to_test, resolution_plots, metadata_to_delete, metadata, data_cat)
+gc()
+``` 
+
+##      Save/Load filtered data object
+        pca, tsne, umap reductions have been done
+        Clustering and analysis are next
+```{r include = TRUE, echo = TRUE}
+seurat_directory <- "~/Sandbox/opa1-scRNAseq-local/seurat_objects/"
+filtered_object <- "filtered_data_object_postclustering.RDS"
+
+
+##### Save point #####
+saveRDS(object = filtered_data_object, paste0(seurat_directory, filtered_object))
+
+##### Load if needbe #####
+#filtered_data_object <- readRDS(paste0(seurat_directory, filtered_object))
+
+##### cleanup #####
+# no longer need merged data object
+
+rm(filtered_object, merged_data_object)
+gc()
+```
+
+
+#     Covariate check of clusters     
+
+##      Feature plots
+
+          * nCount_RNA  (reads)
+          * nFeature_RNA  (genes)
+          * mitoPct  (percent mito genes)
+
+```{r include = TRUE, echo = TRUE}
+covariate_checks <- list("nCount_RNA", "nFeature_RNA", "mitoPct")
+plot_list <- list()
+i <- 1
+for (covariate in covariate_checks) {
+  plot <-   FeaturePlot(object = filtered_data_object,
+              reduction = "initial_umap",
+              features = covariate,
+              split.by = "orig.ident",
+              order = TRUE) + theme(legend.position = c(0.8,0.9))
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+rm(covariate_checks, covariate, plot_list, i)
+gc()
+
+``` 
+
+## IDing clusters based on commonly expressed genes
+
+  cluster 5 = RBCs (Hba-a1 = hemoglobin)
+  cluster 6,8 = CD163l1 -> some sort of fetal-derived CD8s
+  cluster 7 = Macrophages/B cells (H2-Ab1 = MHC class II), Spi1 is a B cell/Myeloid dev marker, Ms4a1 is CD20
+  Part of cluster 1 will probably be removed later after I reclusters T cells
+  
+  Based on above and CD8 and CD3e expression, clusters 0-4 are what I want
+
+```{r include = TRUE, echo = TRUE}
+genes_for_IDing <- c("Cd19","Ms4a1","Hba-a1", "H2-Ab1","Ncr1","Cd3e","Cd8a","Spi1", "Cd4", "Cd24a", "Ikzf2", "Cd163l1","Igf1r","St6galnac3", "Itgal", "Itgam")
+
+
+
+plot_list <- list()
+i <- 1
+for (gene in genes_for_IDing) {
+  plot <- VlnPlot(filtered_data_object, features = gene ,group.by = "seurat_clusters", combine = FALSE)
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+rm(genes_for_IDing, gene,plot, plot_list, i)
+
+``` 
+
+
+## Identify doublets
+
+```{r include = TRUE, echo = TRUE, eval = TRUE}
+
+scDblObj <- scDblFinder(as.SingleCellExperiment(filtered_data_object), samples = "orig.ident")
+
+filtered_data_object <- AddMetaData(filtered_data_object,
+                                 metadata = as.data.frame(scDblObj@colData[,c("scDblFinder.class", "scDblFinder.score", "scDblFinder.weighted", "scDblFinder.cxds_score", "scDblFinder.sample")]))
+
+table(filtered_data_object@meta.data$scDblFinder.class,
+      filtered_data_object@meta.data$scDblFinder.sample)
+
+#I have some doublets
+DimPlot(object = filtered_data_object, reduction = "initial_umap",
+       group.by = "scDblFinder.class", split.by = "orig.ident", order = TRUE)
+
+Idents(filtered_data_object) <- "scDblFinder.class"
+
+filtered_data_object <- subset(x = filtered_data_object, idents = "singlet")
+
+#doublet have been removed - yes, this is the same code as above
+table(filtered_data_object@meta.data$scDblFinder.class,
+      filtered_data_object@meta.data$scDblFinder.sample)
+
+DimPlot(object = filtered_data_object, reduction = "initial_umap",
+       group.by = "scDblFinder.class", split.by = "orig.ident", order = TRUE)
+```
+
+#     Create new (2nd) Seurat Object for the T cell clusters only (clusters 0-4).
+      Will recluster and see if there' anything else I need to get rid of.
+
+```{r include = TRUE, echo = TRUE}
+
+Tcell_data_object <- filtered_data_object %>% subset(seurat_clusters %in% c("0","1","2","3","4"))
+
+table(Tcell_data_object@meta.data$RNA_snn_res.0.15, Tcell_data_object@meta.data$orig.ident)
+table(Tcell_data_object@meta.data$Phase, Tcell_data_object@meta.data$genotype)
+
+#Ok. Non-Tcell clusters have been removed. 
+
+```
+
+##      Save/Load Tcell_data_object
+        initial save
+        PCA, tsne, UMAP, and reclustering have not been done
+```{r include = TRUE, echo = TRUE}
+seurat_directory <- "~/Sandbox/opa1-scRNAseq-local/seurat_objects/"
+Tcell_object <- "Tcell_data_object_initial.RDS"
+
+
+##### Save point #####
+#saveRDS(object = Tcell_data_object, paste0(seurat_directory, Tcell_object))
+
+##### Load if need be #####
+Tcell_data_object <- readRDS(paste0(seurat_directory, Tcell_object))
+
+##### cleanup #####
+# no longer need filtered data object
+
+rm(Tcell_object, filtered_data_object)
+gc()
+```
+
+
+#       Tcell_data_object:
+        ReRun t-SNE, UMAP, and clustering for Tcell only data
+
+##     PCs - still 20
+```{r include = TRUE, echo = TRUE}
+
+##### Variables for running PCA and Finding Neighbors #####
+assay <- "RNA"
+seed <- 18
+number_of_pcs <- 50
+
+
+
+Tcell_data_object <- RunPCA(object = Tcell_data_object,
+                               assay = assay,
+                               seed.use = seed,
+                               npcs = number_of_pcs,
+                               weight.by.var = TRUE)
+
+ElbowPlot(object = Tcell_data_object, ndims = 50, reduction = "pca")
+
+##### Still using pcs = 20 #####
+pcs <- 20
+reduction <- "pca"
+
+Tcell_data_object <- FindNeighbors(object = Tcell_data_object,
+                                      reduction = "pca",
+                                      dims = 1:pcs,
+                                      assay = assay)
+
+##### clean up #####
+rm(assay, seed, number_of_pcs, reduction)
+gc()
+
+
+```
+
+##     t-SNE 
+
+```{r include = TRUE, echo = TRUE}
+
+##### Variables for tsne #####
+
+reduction <- "pca"
+assay <- "RNA"
+seed <- 18
+output_reduction_name <- "Tcell_tsne"
+
+Tcell_data_object <- RunTSNE(object = Tcell_data_object,
+                                dims = 1:pcs,
+                                reduction = reduction,
+                                assay = assay,
+                                seed.use = seed,
+                                reduction.name = output_reduction_name)
+
+#generating tsne plots
+reduction <- "Tcell_tsne"
+groupings <- list("orig.ident", "Phase")
+dimensions <- 1:2 #standard
+
+plot_list <- list()
+i <- 1
+for (group in groupings) {
+  plot <- DimPlot(object = Tcell_data_object,
+                  dims = dimensions,
+                  reduction = reduction,
+                  group.by = group)
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+##### clean up #####
+
+rm(reduction, assay, seed, output_reduction_name, groupings, dimensions, plot_list, i, group, plot)
+gc()
+
+
+
+```
+
+##     Run UMAP
+
+        UMAP plots:
+        1,2)    group by genotype and cell cycle phase
+        3)      group by cell cycle phase, split by genotype
+        
+```{r include = TRUE, echo = TRUE}
+
+##### variables for running UMAP #####
+pcs <- 20
+reduction <- "pca"
+number_of_neighbors <- 30
+seed <- 18
+umap_name <- "Tcell_umap"
+
+
+Tcell_data_object <- RunUMAP(object = Tcell_data_object,
+                                dims = 1:pcs,
+                                reduction = reduction,
+                                assay = assay,
+                                n.neighbors = number_of_neighbors,
+                                seed.use = seed,
+                                reduction.name = umap_name)
+#generating UMAP plots
+reduction <- "Tcell_umap"
+grouping <- list("orig.ident", "Phase", "Phase")
+splitting <- list(NULL, NULL, "orig.ident")
+dimensions <- 1:2 #standard
+
+plot_list <- list()
+i <- 1
+for (umap_index in 1:3) {
+  plot <- DimPlot(object = Tcell_data_object,
+                  dims = dimensions,
+                  reduction = reduction,
+                  group.by = grouping[[umap_index]],
+                  split.by = splitting[[umap_index]])
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+##### cleanup #####
+
+rm(reduction, number_of_neighbors, seed, umap_name, grouping, splitting, dimensions, umap_index, plot_list, plot, i)
+gc()
+
+```
+
+
+##      Re-Clustering T cell object
+
+###    Clustering Tcell_data_object
+        resolutions tested: 0.05, 0.075, 0.1, 0.15, 0.2, 0.3
+        
+        0.075 used moving forward. Gives us 4 clusters to work with again.
+```{r include = TRUE, echo = TRUE}
+
+##### FindNeighbors and FindClusters variables: #####
+reduction <- "pca"
+assay <- "RNA"
+
+resolutions_to_test <-c(0.05, 0.075, 0.1, 0.15, 0.2, 0.3)
+seed <- 18
+algo.num <- 1 #original Louvain algorithm
+
+
+
+#####################
+#####Clustering#####
+#####################
+
+Tcell_data_object <- FindNeighbors(object = Tcell_data_object,
+                                      reduction = reduction,
+                                      dims = 1:pcs,
+                                      assay = assay)
+
+
+Tcell_data_object <- FindClusters(object = Tcell_data_object,
+                                     resolution = resolutions_to_test,
+                                     algorithm = algo.num,
+                                     random.seed = seed)
+
+###### Reduction needed for plotting #####
+reduction <- "Tcell_umap"
+
+#Plotting clustering results
+plot_list <- list()
+i <-1 
+for (res in resolutions_to_test) {
+  plot <-   DimPlot(object = Tcell_data_object,
+              reduction = reduction,
+              label = FALSE,
+              label.size = 6,
+              group.by = paste0("RNA_snn_res.", res),
+              split.by = "orig.ident") +
+              ggtitle(paste0("Res = ", res))
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+#set active ident to correct resolution
+Idents(object = Tcell_data_object) <- "RNA_snn_res.0.075"
+
+
+#cleanup variables
+rm(resolutions_to_test, seed, algo.num, assay, reduction, plot_list, plot, i, res, metadata_to_delete)
+gc()
+
+```
+
+###    Visual check of new clustering
+        Looks good
+```{r include = TRUE, echo = TRUE}
+
+##### VARIABLES ######
+
+dimensions <- 1:2 #standard
+reduction <- "Tcell_umap"
+coloring <- list(c("Sky Blue", "Black"), NULL, NULL)
+
+grouping <- list("orig.ident", "RNA_snn_res.0.075", "Phase")
+splitting <- list(NULL, NULL, "orig.ident")
+
+
+plot_list <- list()
+i <- 1
+for (umap_index in 1:3) {
+  plot <- DimPlot(object = Tcell_data_object,
+                  dims = dimensions,
+                  cols = coloring[[umap_index]],
+                  reduction = reduction,
+                  group.by = grouping[[umap_index]],
+                  split.by = splitting[[umap_index]])
+  plot_list[[i]] <- plot
+  i <- i + 1
+}
+for (i in 1:length(plot_list)) {
+  print(plot_list[[i]])
+}
+
+rm(dimensions, reduction, coloring, grouping, splitting, plot_list, plot, i, umap_index)
+gc()
+
+
+```
+
+
+
+
+###   Set active ident and seurat_clusters to 0.075 
+
+      Clean up Tcell_data_object metadata:
+      remove resolutions 0.05, 0.1, 0.15, 0.2, 0.3
+      remove singlets/doublets metadata
+```{r include = TRUE, echo = TRUE}
+
+Idents(object = Tcell_data_object) <- "RNA_snn_res.0.075"
+Tcell_data_object$seurat_clusters <- Tcell_data_object@active.ident
+
+
+#delete metadata for unused clustering results
+metadata_to_delete <- list("RNA_snn_res.0.05", 
+                           "RNA_snn_res.0.1",
+                           "RNA_snn_res.0.15",
+                           "RNA_snn_res.0.2",
+                           "RNA_snn_res.0.3",
+                           "scDblFinder.class",
+                           "scDblFinder.weighted",
+                           "scDblFinder.score",
+                           "scDblFinder.sample",
+                           "scDblFinder.cxds_score"
+                           )
+for (metadata in metadata_to_delete) {
+  data_cat <- paste0("Tcell_data_object$", metadata, " <- NULL")
+  eval(rlang::parse_expr(data_cat))
+}
+
+#set active ident to correct resolution
+Idents(object = Tcell_data_object) <- "RNA_snn_res.0.075"
+
+rm(scDblObj, metadata_to_delete, metadata, data_cat)
+gc()
+
+```
+
+
+#     T Cell cluster wrangling
+          Resolution = 0.0075 (This has also been 0.1 before. Looking for 4 total clusters: 
+          1 naive and 3 activated clusters. 2 clusters are G1, 2 clusters are S/G2M)
+          
+##   Identify Naive T cell cluster based on Lef1 and Tcf7 expression.
+
+```{r include = TRUE, echo = TRUE}
+
+FeaturePlot(object = Tcell_data_object,
+            reduction = "Tcell_umap",
+            features = "Lef1",
+            split.by = "orig.ident",
+            order = FALSE) + theme(legend.position = c(0.8,0.9))
+
+FeaturePlot(object = Tcell_data_object,
+            reduction = "Tcell_umap",
+            features = "Tcf7",
+            split.by = "orig.ident",
+            order = FALSE) + theme(legend.position = c(0.8,0.9))
+
+```
+
+##    Label cells as Naive and activated
+      
+      New metadata = activation_status
+
+```{r include = TRUE, echo = TRUE}
+#cluster 0    = naive
+#cluster 1-3  = activated
+
+Tcell_data_object$activation_status <- ifelse(test = Tcell_data_object$seurat_clusters == 0,
+                                              yes = "naive",
+                                              no = "activated")
+
+#check
+table(Tcell_data_object@active.ident, Tcell_data_object@meta.data$activation_status)
+
+```
+
+
+##    Removing single WT cells in the opa1_unique cluster
+      Just to clean things up
+      
+```{r include = TRUE, echo = TRUE}
+#single WT cell in the unique Opa1 cluster, removing for ease of any downstream analyses
+table(Tcell_data_object@meta.data$seurat_clusters, Tcell_data_object@meta.data$orig.ident)
+
+
+#found the wt cell in this clusters: "wt_CCCGGAAAGCTAGAAT"
+head(WhichCells(Tcell_data_object, ident = "3"), 10)
+toRemove <- "wt_CCCGGAAAGCTAGAAT"
+
+#wt cell has been removed
+Tcell_data_object <- Tcell_data_object[, !colnames(Tcell_data_object) %in% toRemove]
+table(Tcell_data_object@meta.data$seurat_clusters, Tcell_data_object@meta.data$orig.ident)
+
+rm(toRemove)
+gc()
+
+```
+
+#   Save/Load Tcell_data_object for analysis
+    
+```{r include=TRUE, echo=TRUE}
+seurat_directory <- "~/Sandbox/opa1-scRNAseq-local/seurat_objects/"
+Tcell_object <- "Tcell_data_object_forAnalysis.RDS"
+
+#saveRDS(object = Tcell_data_object, paste0(seurat_directory, Tcell_object))
+
+##### load if need be #####
+Tcell_data_object <- readRDS(paste0(seurat_directory, Tcell_object))
+
+rm(Tcell_object, seurat_directory)
+gc()
+```
+
+
+
+
+#       Figures for the paper!
+        6A - 6H
+        
+```{r include = TRUE, echo = TRUE}
+
+#Fig 6a
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "activation_status", cols = c("dark red","gray"))
+
+#Fig 6b
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "genotype", cols = c("skyblue","black"))
+
+#Fig 6c
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "seurat_clusters", split.by = "genotype", cols = c("black","lightgreen","tan","royalblue1"))
+
+#Fig 6d
+ggplot(Tcell_data_object@meta.data, aes(x = seurat_clusters, fill = genotype)) + scale_fill_manual(values = c("skyblue","black"))+ geom_bar(position = "fill") + ylab("Proportion of Cluster")
+
+#Fig 6e
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "Phase", split.by = "genotype", cols = c("black","red","yellow"))
+
+#Fig 6f
+ggplot(Tcell_data_object@meta.data, aes(x = RNA_snn_res.0.075, fill = Phase)) + scale_fill_manual(values = c("black","red","yellow"))+ geom_bar() + xlab("Cluster")
+
+```
+
+
+#         Supp Figure 5A
+```{r moduel score}
+
+#Fig S5A
+supp5a_list <- c("Tcf7","Lef1","Bach2","Il7r","Ccr7","Mki67","Nr4a1","Gzmb","Gzmk","Ifng","Itgb1","Itgax","Il12rb1","Il12rb2","Prf1","Klrc1")
+
+DotPlot(object = Tcell_data_object,
+        features = supp5a_list) + 
+  scale_colour_gradientn(colors = c("gray95","#FFFF99","#00CCCC","navy")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  ylab("Cluster") + 
+  xlab("gene")
+
+rm(supp5a_list)
+```
+
+#         Load in Pathways for GSEA (Supp 5B and 6K,L)  
+          MSigDB pathways
+```{r moduel score}
+#OUTPUT: gmt_hallmark_list
+
+MSigDB_directory <- "~/Sandbox/reference_data/MSigDB/"
+
+Mm.h <- read.gmt(paste0(MSigDB_directory, "mh.all.v2023.2.Mm.symbols.gmt"))
+
+#turn gmt file into list of pathways with genes associated with them
+#Thank you T.Brunetti!
+gmt <- Mm.h
+transformed_gmt = gmt %>% group_by(term) %>% summarise(gene_list = str_c(sort(gene), collapse = ","), .groups = 'drop')
+transformed_gmt = as.data.frame(transformed_gmt)
+gmt_hallmark_list = list()
+for (i in 1:nrow(transformed_gmt)){
+  gmt_hallmark_list[[as.character(transformed_gmt[i, "term"])]] = unlist(stringr::str_split(transformed_gmt[i,'gene_list'], pattern = ','))
+}
+
+
+rm(gmt, transformed_gmt, i)
+gc()
+```
+
+
+#         Supp - GSEA of hallmark pathways on clusters 1 and 3
+
+```{r moduel score}
+
+allMarkers <- FindAllMarkers(object = Tcell_data_object,
+                             assay = "RNA",
+                             logfc.threshold = 0.25,
+                             test.use = "wilcox",
+                             only.pos = FALSE,
+                             verbose = TRUE,
+                             layer = 'scale.data',
+                             min.pct = 0.25)
+
+#GSEA for cluster 1
+cluster1_data <- allMarkers[allMarkers$cluster == "1",] 
+
+#rank by log2FC
+cluster1_ranks <- data.frame(gene = cluster1_data$gene, log2FC = cluster1_data$avg_log2FC)
+#cluster1_ranks <- cluster1_ranks[order(cluster1_ranks$log2FC, decreasing = TRUE), ]
+ranks_1 <- cluster1_ranks$log2FC
+names(ranks_1) <- cluster1_ranks$gene
+
+cluster1_fgsea_results <- fgsea(pathways = gmt_hallmark_list, stats = ranks_1, minSize = 15, maxSize = 500)
+
+
+#Cluster 3
+cluster3_data <- allMarkers[allMarkers$cluster == "3",] 
+cluster3_ranks <- data.frame(gene = cluster3_data$gene, log2FC = cluster3_data$avg_log2FC)
+ranks_3 <- cluster3_ranks$log2FC
+names(ranks_3) <- cluster3_ranks$gene
+
+cluster3_fgsea_results <- fgsea(pathways = gmt_hallmark_list, stats = ranks_3, minSize = 15, maxSize = 500)
+
+#extract pathway and NES from GSEA results
+df_list <- list()
+cluster1_temp <- cluster1_fgsea_results[, c("pathway","NES"), drop = FALSE]
+cluster3_temp <- cluster3_fgsea_results[, c("pathway","NES"), drop = FALSE]
+df_list[[1]] <- cluster1_temp
+df_list[[2]] <- cluster3_temp
+
+#organize df that will be used for heatmap
+combined_df <- Reduce(function(x, y) merge(x, y, by = "pathway", all = TRUE), df_list)
+colnames(combined_df) <- c("pathway","cluster1", "cluster3")
+combined_df <- as.data.frame(combined_df)
+combined_df[is.na(combined_df)] <- 0
+rownames(combined_df) <- combined_df$pathway
+
+#remome HALLMARK_ from pathway names
+pathway_names_altered <- list()
+for (name in rownames(combined_df)) {
+  name <- str_replace(name, "HALLMARK_", "")
+  pathway_names_altered[[name]] <- name
+}
+rownames(combined_df) <- pathway_names_altered
+combined_df$pathway <- NULL
+combined_matrix_S5B <- as.matrix(combined_df)
+
+pheatmap(combined_matrix_S5B,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         scale = "column",
+         cellwidth = 10,
+         cellheight = 6,
+         fontsize_row = 6,
+         fontsize_col = 6,
+         main = "hi",
+         color = colorRampPalette(c("white","blue4"))(20))
+
+rm(cluster1_data, cluster1_fgsea_results, cluster1_ranks, cluster1_temp,cluster3_data, cluster3_fgsea_results, cluster3_ranks, cluster3_temp)
+rm(combined_df, df_list, pathway_names_altered)
+rm(name, ranks_1, ranks_3)
+
+```
+
+#         Supp Figure 5C
+```{r moduel score}
+#Get Myc targets and combine
+Mm.h_entrez <- readRDS(file= paste0(MSigDB_directory, "Mm.h.all.v7.1.entrez.rds"))
+
+Hallmark_Myc_targets_v1 <- mapIds(org.Mm.eg.db, Mm.h_entrez$HALLMARK_MYC_TARGETS_V1, 'SYMBOL', 'ENTREZID')
+Hallmark_Myc_targets_v2 <- mapIds(org.Mm.eg.db, Mm.h_entrez$HALLMARK_MYC_TARGETS_V2, 'SYMBOL', 'ENTREZID')
+myc_combined <- c(Hallmark_Myc_targets_v1, Hallmark_Myc_targets_v2)
+  
+Tcell_data_object <- AddModuleScore(Tcell_data_object, features = list(myc_combined), name = 'myc_combined')
+
+Tcell_data_object@meta.data$myc_combined <- Tcell_data_object@meta.data$myc_combined1
+Tcell_data_object@meta.data$myc_combined1 <- NULL
+
+
+
+
+#plotting data
+scored_list <- "myc_combined"
+grouping <- "seurat_clusters"
+colors <- c("black","#66FF99","tan","#0066CC")
+
+
+VlnPlot(Tcell_data_object,
+            features = "myc_combined",
+            group.by = grouping,
+            pt.size = 0,
+            y.max = 0.85,
+            cols = colors
+            ) +
+              labs(x = "cluster", y = "Module Score", title = "") +
+              geom_hline(yintercept = c(0.2, 0.4, 0.6, 0.8), linetype = "dashed", color = "gray50")
+
+rm(scored_list, grouping, colors)
+rm(Hallmark_Myc_targets_v1, Hallmark_Myc_targets_v2, myc_combined)
+
+
+```
+
+------- good to here ---------
+
+
+
+#   Generate files for cNMF analysis
+    
+```{r include=TRUE, echo=TRUE}
+
+filtered_dir = '/Users/ben/Sandbox/opa1-scRNAseq-local/cnmf/'
+
+counts <- Tcell_data_object@assays$RNA$counts
+barcodes <- colnames(counts)
+gene_names <- rownames(counts)
+
+
+
+# Output counts matrix
+writeMM(counts, paste0(filtered_dir, 'matrix.mtx'))
+
+# Output cell barcodes
+write.table(as.data.frame(barcodes), paste0(filtered_dir, 'barcodes.tsv'),
+           col.names = FALSE, row.names = FALSE, sep = "\t")
+
+# Output feature names
+features <- data.frame("gene_id" = gene_names,"gene_name" = gene_names,type = "Gene Expression")
+write.table(as.data.frame(features), sep = "\t", paste0(filtered_dir, 'genes.tsv'),
+           col.names = FALSE, row.names = FALSE)
+
+```
+
+##    cNMF
+```{r include = TRUE, echo = TRUE}
+
+system(command = "cnmf prepare --output-dir ~/Sandbox/opa1-scRNAseq-local/cnmf/output_0226/ --name opa1_cnmf -c ~/Sandbox/opa1-scRNAseq-local/cnmf/matrix.mtx -k 4 5 6 --max-nmf-iter 2000 --n-iter 100 --numgenes 2000")
+
+system(command = "cnmf factorize --output-dir ~/Sandbox/opa1-scRNAseq-local/cnmf/output_0226/ --name opa1_cnmf --worker-index 0 --total-workers 1")
+
+system(command = "cnmf combine --output-dir ~/Sandbox/opa1-scRNAseq-local/cnmf/output_0226/ --name opa1_cnmf")
+
+
+system(command = "cnmf k_selection_plot --output-dir ~/Sandbox/opa1-scRNAseq-local/cnmf/output_0226/ --name opa1_cnmf")
+
+system(command = "cnmf consensus --output-dir ~/Sandbox/opa1-scRNAseq-local/cnmf/output_0226/ --name opa1_cnmf --components 5 --local-density-threshold 0.01 --show-clustering")
+
+```
+
+
+##    Load in cNMF outputs 
+      Need local path to cNMF output files
+```{r include = TRUE, echo = TRUE}
+#directory with cNMF output files
+cnmf_output_directory <- "~/Sandbox/opa1-scRNAseq-local/cnmf/output_0226/opa1_cnmf/"
+
+
+usage_file <- read.table(paste0(cnmf_output_directory, "opa1_cnmf.usages.k_5.dt_0_01.consensus.txt"), sep = '\t', row.names = 1, header = TRUE)
+
+spectra_score <- read.table(paste0(cnmf_output_directory, "opa1_cnmf.gene_spectra_score.k_5.dt_0_01.txt"), sep = '\t', row.names = 1, header = TRUE)
+  
+spectra_tpm <- read.table(paste0(cnmf_output_directory, "opa1_cnmf.gene_spectra_tpm.k_5.dt_0_01.txt"), sep = '\t', row.names = 1, header = TRUE)
+
+usage_norm <- as.data.frame(t(apply(usage_file, 1, function(x) x / sum(x))))
+
+```
+
+
+#   Add cNMF data into metadata of seurat obj and plot on UMAP
+    
+```{r include = TRUE, echo = TRUE}
+
+#rename usage_norm columns to GEPs
+colnames(usage_norm) <- c("GEP1", "GEP2", "GEP3", "GEP4", "GEP5")
+
+cnmf_metadata <- merge(Tcell_data_object@meta.data, usage_norm, by = "row.names", all.x = TRUE)
+
+rownames(cnmf_metadata) <- cnmf_metadata$Row.names
+
+#Apply an individual GEP to each cell based on the highest value of GEPs 1-5
+cnmf_metadata <- cnmf_metadata %>%
+  mutate(max_category = ifelse(apply(cnmf_metadata[c("GEP1", "GEP2", "GEP3", "GEP4", "GEP5")], 1, FUN = which.max) == 1, "GEP1", 
+                             ifelse(apply(cnmf_metadata[c("GEP1", "GEP2", "GEP3", "GEP4", "GEP5")], 1, FUN = which.max) == 2, "GEP2",
+                                    ifelse(apply(cnmf_metadata[c("GEP1", "GEP2", "GEP3", "GEP4", "GEP5")], 1, FUN = which.max) == 3, "GEP3",
+                                           ifelse(apply(cnmf_metadata[c("GEP1", "GEP2", "GEP3", "GEP4", "GEP5")], 1, FUN = which.max) == 4, "GEP4","GEP5"))))) 
+Tcell_data_object@meta.data <- cnmf_metadata
+
+Tcell_data_object@meta.data$Row.names <- NULL
+
+```
+
+#    Figures 6G-J
+```{r include = TRUE, echo = TRUE}
+
+
+#Fig 6G
+DimPlot(object = Tcell_data_object, dims = 1:2, reduction = "Tcell_umap", group.by = "max_category", split.by = "genotype", cols = c("#6699cc","#003366","darkorange3","darkgreen", "gold3"), pt.size = 0.8) + labs(title = "")
+
+#Fig 6H
+#paper has Opa1 on bottom but thats ok. This is the gist of the plot
+ggplot(Tcell_data_object@meta.data, aes(x = max_category, fill = genotype)) + scale_fill_manual(values = c("skyblue2","black"))+ geom_bar(position = "fill") + ylab("Frequency (%)")
+
+#Fig 6i - WT
+ggplot(data = Tcell_data_object@meta.data[Tcell_data_object@meta.data$genotype == "wt",], aes(x = max_category, fill = Phase)) + scale_fill_manual(values = c("black","red","yellow"))+ geom_bar() + xlab("Cluster") + labs(title = "WT") + theme(plot.title = element_text(hjust = 0.5, size = 25))
+
+#Fig 6j - opa1
+ggplot(data = Tcell_data_object@meta.data[Tcell_data_object@meta.data$genotype == "opa1",], aes(x = max_category, fill = Phase)) + scale_fill_manual(values = c("black","red","yellow"))+ geom_bar() + xlab("Cluster") + labs(title = "Opa1") + theme(plot.title = element_text(hjust = 0.5, size = 25))
+
+
+```
+
+####    Identify top defining genes per cluster
+```{r include = TRUE, echo = TRUE}
+
+
+top20perCluster <- allMarkers %>% group_by(cluster) %>% top_n(20, avg_log2FC)
+```
+####    DotPlots of top defining genes
+```{r include = TRUE, echo = TRUE}
+
+DotPlot(object = Tcell_data_object, features = unique(top10perCluster$gene)) +
+         theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+####    Heatmaps
+```{r include = TRUE, echo = TRUE}
+
+#this doesn't look like scott's but I think he also removed some clusters? idk...
+
+DoHeatmap(Tcell_data_object, features = top20perCluster$gene, group.by = "seurat_clusters") + scale_fill_gradient2(high = "yellow1", mid ="#009966", low = "navy")
+
+```
+
+
+
+
+
+#       Pathway analysis of GEPs! - THANK YOU FOR THE CODE T. BRUNETTI!!
+        https://github.com/tbrunetti/cNMF_fgsea_wrapper
+```{r include = TRUE, echo = TRUE}
+
+library(fgsea)
+library(clusterProfiler)
+library(stringr)
+library(pheatmap)
+source("~/Sandbox/cNMF_fgsea_wrapper/scripts/fgsea_cNMF_ranks_funcs.R")
+
+
+
+```
+
+##      USER INPUT NEEDED
+```{r include = TRUE, echo = TRUE}
+#location of fgsea_cNMF_ranks_funcs.R file
+#can get from Tonya's github
+source("~/Sandbox/cNMF_fgsea_wrapper/scripts/fgsea_cNMF_ranks_funcs.R")
+seed = 42
+
+#locations of gmt files for BOTH hallark and gobp
+gmt_file_input_hallmark = "~/Sandbox/reference_data/MSigDB/mh.all.v2023.2.Mm.symbols.gmt" #gmt file for hallmark (6K) files
+gmt_file_input_gobp = "~/Sandbox/reference_data/MSigDB/m5.go.bp.v2023.2.Mm.symbols.gmt" #gmt file for gobp (6L) files
+
+#output location
+output_prefix = "~/Sandbox/opa1-scRNAseq-local/ross_vs_ben_output/" # path and prefix of what to call saved file
+
+#locations for spectra file
+cnmf_spectra_scores_file = "~/Sandbox/opa1-scRNAseq-local/cnmf/output_0226/opa1_cnmf/opa1_cnmf.gene_spectra_score.k_5.dt_0_01.txt"
+
+#gobp file containing pathways shown in Fig 6L
+gobp_csv <- read.csv("~/Sandbox/opa1-scRNAseq-local/Fig6L_pathways/supp_table.csv")
+
+
+#other
+adjp_thresh = 0.05 # non-inclusive, anything below this value will be retained
+nes_thresh = "both" # options are positive, negative, or both
+
+```
+
+##      (1) Calculate enrichment scores with fgsea and (2) filter results by padj and NES - 6K (hallmark pathways)
+```{r include = TRUE, echo = TRUE}
+
+##########################################################################################
+################## Step 1 - calculate your enrichment scores using fgsea #################
+### ONLY NEEDS TO BE DONE ONCE FOR A DATASET, as data is save as .Rdat for use later! ####
+##########################################################################################
+step1_enrichment_results_6K <- calculate_enrichment(gmt_file_input = gmt_file_input_hallmark, 
+                                                 output_prefix = output_prefix, 
+                                                 cnmf_spectra_scores_file = cnmf_spectra_scores_file, 
+                                                 seed = seed)
+
+##########################################################################################
+###################### Step 2 - filter fGSEA results by padj and NES #####################
+##########################################################################################
+filtered_fgsea_results_6K <- filter_results(unfiltered_fgsea_results = step1_enrichment_results_6K@unfiltered, 
+                                         adjp_thresh = adjp_thresh, 
+                                         nes_thresh = nes_thresh)
+
+
+
+```
+
+
+##      Figure 6K
+```{r include = TRUE, echo = TRUE}
+
+#for 6K
+df_list <- list()
+for (i in (1:5)){
+  hallmark_GEP <- filtered_fgsea_results_6K[[i]]
+  hallmark_GEP <- as.data.frame(hallmark_GEP)
+  rownames(hallmark_GEP) <- hallmark_GEP$pathway
+  hallmark_GEP <- hallmark_GEP[, c("pathway","NES"), drop = FALSE]
+  df_list[[i]] <- hallmark_GEP
+}
+
+hallmark_df <- Reduce(function(x, y) merge(x, y, by = "pathway", all = TRUE), df_list)
+colnames(hallmark_df) <- c("pathway", "GEP1", "GEP2", "GEP3", "GEP4", "GEP5")
+hallmark_df[is.na(hallmark_df)] <- 0
+rownames(hallmark_df) <- hallmark_df$pathway
+hallmark_df$pathway <- NULL
+
+
+#remome HALLMARK_ from pathway names
+pathway_names_altered <- list()
+for (name in rownames(hallmark_df)) {
+  name <- str_replace(name, "HALLMARK_", "")
+  pathway_names_altered[[name]] <- name
+}
+rownames(hallmark_df) <- pathway_names_altered
+
+
+
+#remove pathways to be excluded in heatmap
+#yes this is not a great way to order the pathways. I am just reproducing the plots from the figure here.
+hallmark_df$temp <- rownames(hallmark_df)
+heatmap_pathways <- c("MYC_TARGETS_V1", "MYC_TARGETS_V2", "OXIDATIVE_PHOSPHORYLATION", "MTORC1_SIGNALING", "UNFOLDED_PROTEIN_RESPONSE", "GLYCOLYSIS", "FATTY_ACID_METABOLISM", "DNA_REPAIR", "UV_RESPONSE_UP", "UV_RESPONSE_DN", "XENOBIOTIC_METABOLISM", "P53_PATHWAY", "HYPOXIA", "IL2_STAT5_SIGNALING", "KRAS_SIGNALING_DN", "HEME_METABOLISM", "INTERFERON_GAMMA_RESPONSE", "ALLOGRAFT_REJECTION", "KRAS_SIGNALING_UP", "IL6_JAK_STAT3_SIGNALING", "INFLAMMATORY_RESPONSE", "TNFA_SIGNALING_VIA_NFKB", "COMPLEMENT", "APICAL_JUNCTION", "PROTEIN_SECRETION", "APICAL_SURFACE", "E2F_TARGETS", "G2M_CHECKPOINT", "MITOTIC_SPINDLE")
+
+hallmark_df <- hallmark_df %>% dplyr::filter(temp %in% heatmap_pathways)
+hallmark_df$temp <- NULL
+
+hallmark_df_ordered <- hallmark_df %>% arrange(match(rownames(hallmark_df), heatmap_pathways))
+
+hallmark_df_ordered <- as.matrix(hallmark_df_ordered)
+
+pheatmap(hallmark_df_ordered,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         scale = "row",
+         cellwidth = 10,
+         cellheight = 10,
+         fontsize_row = 8,
+         color = c("blue4","cornsilk4","yellow2")) 
+
+rm(hallmark)
+
+```
+
+##      (1) Calculate enrichment scores with fgsea and (2) filter results by padj and NES - 6L (gobp pathways)
+```{r include = TRUE, echo = TRUE}
+
+##########################################################################################
+################## Step 1 - calculate your enrichment scores using fgsea #################
+### ONLY NEEDS TO BE DONE ONCE FOR A DATASET, as data is save as .Rdat for use later! ####
+##########################################################################################
+step1_enrichment_results_6L <- calculate_enrichment(gmt_file_input = gmt_file_input_gobp, 
+                                                 output_prefix = output_prefix, 
+                                                 cnmf_spectra_scores_file = cnmf_spectra_scores_file, 
+                                                 seed = seed)
+
+##########################################################################################
+###################### Step 2 - filter fGSEA results by padj and NES #####################
+##########################################################################################
+filtered_fgsea_results_6L <- filter_results(unfiltered_fgsea_results = step1_enrichment_results_6L@unfiltered, 
+                                         adjp_thresh = adjp_thresh, 
+                                         nes_thresh = nes_thresh)
+
+
+
+```
+
+##      Figure 6L
+```{r include = TRUE, echo = TRUE}
+#for Figure 6L
+#extract NES for pathways in each GEP from filtered_fgsea_results
+df_list <- list()
+for (i in (1:5)){
+  GEP <- filtered_fgsea_results_6L[[i]]
+  GEP <- as.data.frame(GEP)
+  rownames(GEP) <- GEP$pathway
+  GEP <- GEP[, c("pathway","NES"), drop = FALSE]
+  df_list[[i]] <- GEP
+}
+
+#merge NES for each GEP it one dataframe
+gobp_df
+
+gobp_df <- Reduce(function(x, y) merge(x, y, by = "pathway", all = TRUE), df_list)
+colnames(gobp_df) <- c("pathway", "GEP1", "GEP2", "GEP3", "GEP4", "GEP5")
+gobp_df[is.na(gobp_df)] <- 0
+rownames(gobp_df) <- gobp_df$pathway
+gobp_df$pathway <- NULL
+
+#check
+head(gobp_df)
+
+
+#remome GOBP_ from pathway names
+pathway_names_altered <- list()
+for (name in rownames(gobp_df)) {
+  name <- str_replace(name, "GOBP_", "")
+  pathway_names_altered[[name]] <- name
+}
+rownames(gobp_df) <- pathway_names_altered
+
+#check
+head(gobp_df)
+
+pathways_of_interest_df <- gobp_csv[, c("category", "pathway")]
+
+
+row_index <- rownames(pathways_of_interest_df)
+index <- 0
+gobp_heatmap_pathways <- list()
+for (pathway in pathways_of_interest_df$pathway) {
+  gobp_heatmap_pathways[[pathway]] <- pathway
+  index = index + 1
+}
+
+head(names(gobp_heatmap_pathways))
+
+gobp_df$pathway <- rownames(gobp_df)
+gobp_df_heatmap <- gobp_df %>% dplyr::filter(pathway %in% names(gobp_heatmap_pathways))
+
+#add category for pathway that will be used to group in figure
+gobp_df_heatmap$category <- pathways_of_interest_df$category[match(gobp_df_heatmap$pathway, pathways_of_interest_df$pathway)]
+
+#remove pathways with NA values
+gobp_df_heatmap <- gobp_df_heatmap[complete.cases(gobp_df_heatmap), ]
+
+
+gobp_df_heatmap <- gobp_df_heatmap[order(gobp_df_heatmap$category, decreasing = FALSE), ]
+
+gobp_df_heatmap$category <- NULL
+gobp_df_heatmap$pathway <- NULL
+
+
+gobp_df_heatmap <- as.matrix(gobp_df_heatmap)
+
+pheatmap(gobp_df_heatmap,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         scale = "row", 
+         cellwidth = 7.5,
+         cellheight = 4,
+         fontsize_row = 4,
+         fontsize_col = 6,
+         color = colorRampPalette(c("blue4","cornsilk4","yellow1"))(25))
+
+rm(gobp_csv, gobp_df, gobp_df_heatmap, gobp_heatmap_pathways, pathways_of_interest_df)
+
+
+
+
+```
+
+
+
+
