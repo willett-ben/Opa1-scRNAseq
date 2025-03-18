@@ -1341,22 +1341,6 @@ ggplot(Tcell_data_object@meta.data, aes(x = RNA_snn_res.0.075, fill = Phase)) + 
 ```
 
 
-#         Supp Figure 5A
-```{r moduel score}
-
-#Fig S5A
-supp5a_list <- c("Tcf7","Lef1","Bach2","Il7r","Ccr7","Mki67","Nr4a1","Gzmb","Gzmk","Ifng","Itgb1","Itgax","Il12rb1","Il12rb2","Prf1","Klrc1")
-
-DotPlot(object = Tcell_data_object,
-        features = supp5a_list) + 
-  scale_colour_gradientn(colors = c("gray95","#FFFF99","#00CCCC","navy")) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
-  ylab("Cluster") + 
-  xlab("gene")
-
-rm(supp5a_list)
-```
-
 #         Load in Pathways for GSEA (Supp 5B and 6K,L)  
           MSigDB pathways
 ```{r moduel score}
@@ -1381,8 +1365,24 @@ rm(gmt, transformed_gmt, i)
 gc()
 ```
 
+#         Supplemental Figure 5A
+```{r moduel score}
 
-#         Supp - GSEA of hallmark pathways on clusters 1 and 3
+#Fig S5A
+supp5a_list <- c("Tcf7","Lef1","Bach2","Il7r","Ccr7","Mki67","Nr4a1","Gzmb","Gzmk","Ifng","Itgb1","Itgax","Il12rb1","Il12rb2","Prf1","Klrc1")
+
+DotPlot(object = Tcell_data_object,
+        features = supp5a_list) + 
+  scale_colour_gradientn(colors = c("gray95","#FFFF99","#00CCCC","navy")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  ylab("Cluster") + 
+  xlab("gene")
+
+rm(supp5a_list)
+```
+
+#         Supplemental Figure 5B
+          GSEA of hallmark pathways on clusters 1 and 3
 
 ```{r moduel score}
 
@@ -1495,6 +1495,32 @@ rm(Hallmark_Myc_targets_v1, Hallmark_Myc_targets_v2, myc_combined)
 
 ```
 
+##           Identify top defining genes per cluster
+```{r include = TRUE, echo = TRUE}
+
+top15perCluster <- allMarkers %>% group_by(cluster) %>% top_n(15, avg_log2FC)
+```
+
+###    DotPlots of top defining genes
+```{r include = TRUE, echo = TRUE}
+
+DotPlot(object = Tcell_data_object, features = unique(top15perCluster$gene)) +
+         theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+###    Heatmaps
+```{r include = TRUE, echo = TRUE}
+
+#this doesn't look like scott's but I think he also removed some clusters? idk...
+
+DoHeatmap(Tcell_data_object, features = top15perCluster$gene, group.by = "seurat_clusters") + scale_fill_gradient2(high = "yellow1", mid ="#009966", low = "navy")
+
+```
+
+
+
+
 #   Generate files for cNMF analysis
     
 ```{r include=TRUE, echo=TRUE}
@@ -1537,7 +1563,6 @@ system(command = "cnmf consensus --output-dir ~/Sandbox/opa1-scRNAseq-local/cnmf
 
 ```
 
-
 ##    Load in cNMF outputs 
       Need local path to cNMF output files
 ```{r include = TRUE, echo = TRUE}
@@ -1555,8 +1580,7 @@ usage_norm <- as.data.frame(t(apply(usage_file, 1, function(x) x / sum(x))))
 
 ```
 
-
-#   Add cNMF data into metadata of seurat obj and plot on UMAP
+##   Add cNMF data into metadata of seurat obj and plot on UMAP
     
 ```{r include = TRUE, echo = TRUE}
 
@@ -1599,33 +1623,6 @@ ggplot(data = Tcell_data_object@meta.data[Tcell_data_object@meta.data$genotype =
 
 ```
 
-####    Identify top defining genes per cluster
-```{r include = TRUE, echo = TRUE}
-
-
-top20perCluster <- allMarkers %>% group_by(cluster) %>% top_n(20, avg_log2FC)
-```
-####    DotPlots of top defining genes
-```{r include = TRUE, echo = TRUE}
-
-DotPlot(object = Tcell_data_object, features = unique(top10perCluster$gene)) +
-         theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-
-```
-####    Heatmaps
-```{r include = TRUE, echo = TRUE}
-
-#this doesn't look like scott's but I think he also removed some clusters? idk...
-
-DoHeatmap(Tcell_data_object, features = top20perCluster$gene, group.by = "seurat_clusters") + scale_fill_gradient2(high = "yellow1", mid ="#009966", low = "navy")
-
-```
-
-
-
-
-
 #       Pathway analysis of GEPs! - THANK YOU FOR THE CODE T. BRUNETTI!!
         https://github.com/tbrunetti/cNMF_fgsea_wrapper
 ```{r include = TRUE, echo = TRUE}
@@ -1635,8 +1632,6 @@ library(clusterProfiler)
 library(stringr)
 library(pheatmap)
 source("~/Sandbox/cNMF_fgsea_wrapper/scripts/fgsea_cNMF_ranks_funcs.R")
-
-
 
 ```
 
@@ -1691,7 +1686,7 @@ filtered_fgsea_results_6K <- filter_results(unfiltered_fgsea_results = step1_enr
 ```
 
 
-##      Figure 6K
+###      Figure 6K
 ```{r include = TRUE, echo = TRUE}
 
 #for 6K
@@ -1769,7 +1764,7 @@ filtered_fgsea_results_6L <- filter_results(unfiltered_fgsea_results = step1_enr
 
 ```
 
-##      Figure 6L
+###      Figure 6L
 ```{r include = TRUE, echo = TRUE}
 #for Figure 6L
 #extract NES for pathways in each GEP from filtered_fgsea_results
