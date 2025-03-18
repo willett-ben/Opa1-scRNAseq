@@ -48,6 +48,8 @@ General process:
     6G) GEPs identified by cNMF, split by genotype
     6H) makeup of each GEP (WT vs KO)
     6I-J) Cell counts per GEP, split by genotype
+    6K) GSEA in GEPs for Hallmark pathways
+    6L) GSEA in GEPs for GOBP pathways involved in cell cycle stages and metabolic regulation
 
     S5A) expression patterns of Tcell-relevant genes by clusters
     S5C) module score for hallmark Myc1 and Myc2 genesets (combined)
