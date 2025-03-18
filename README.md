@@ -1,5 +1,5 @@
 # Opa1-scRNAseq
-scRNAseq analysis included in Willett et al. 2025 (in review at Cell Reports)
+scRNAseq analysis included in Willett et al. 2025 (Accepted at Cell Reports, publication data: TBD)
 
 Experimental details:
 WT and Opa1-/- OT1 CD8 T cells
