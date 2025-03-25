@@ -288,10 +288,10 @@ rm(features_to_plot)
 
 filtered_data_object <- subset(x = merged_data_object,
                                subset = 
-                                 (nFeature_RNA >= 2000) &
-                                 (nCount_RNA >= 8500) &
-                                 (mitoPct < 10) &
-                                 (complexity > 0.75))
+                                 (nFeature_RNA >= 200) &
+                                 (nCount_RNA >= 1000) &
+                                 (mitoPct < 20) &
+                                 (complexity > 0.80))
 ```
 
 * The total number of cells before filtering  
