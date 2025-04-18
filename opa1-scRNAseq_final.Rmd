@@ -398,16 +398,16 @@ gc()
 #     Filtering 
 ##    Cell-Level filtering
 
-* keep cells with at least 200 unique genes present per cell  
-* keep cells with at 1000 reads present per cell  
-* keep cells that have a mitochondrial contamination percent of less than 20%  
-* keep cell with a complexity of greater than 80%  
+* keep cells with at least 2000 unique genes present per cell  
+* keep cells with at 8500 reads present per cell  
+* keep cells that have a mitochondrial contamination percent of less than 10%  
+* keep cell with a complexity of greater than 75%  
 
 
 ```{r include = TRUE, echo = TRUE}
 #INPUT NEEDED
-gene_filter <- 200
-read_filter <- 1000
+gene_filter <- 2000
+read_filter <- 8500
 mito_filter <- 10
 complexity_filter <- 0.75
 
@@ -1211,7 +1211,7 @@ gc()
           * mitoPct  (percent mito genes)
 
 ```{r include = TRUE, echo = TRUE}
-#USER INPUT NEEDED
+#USER INPUT NEEDED (1/1)
 covariate_checks <- list("nCount_RNA", "nFeature_RNA", "mitoPct")
 reduction <- "initial_umap"
 groups <- "genotype"
@@ -1248,7 +1248,7 @@ gc()
 
 ```{r include = TRUE, echo = TRUE}
 
-#USER INPUT NEEDED
+#USER INPUT NEEDED (1/2)
 Tcell_genes <- list("Cd3e","Cd8a", "Cd4")
 Bcell_genes <- c("Cd19","Ms4a1","H2-Ab1")
 Myeloid_genes <- c("Spi1", "H2-Ab1", "Cd24a", "Cd68", "Itgal", "Itgam")
@@ -1338,7 +1338,7 @@ for (metadata in metadata_to_delete) {
 }
 
 
-#USER INPUT REQUIRED - update seruat object
+#USER INPUT REQUIRED - update seruat object (2/2)
 filtered_data_object <- dataset
 
 
@@ -1409,7 +1409,7 @@ Tcell_data_object <- RunPCA(object = Tcell_data_object,
                                weight.by.var = TRUE)
 
 ElbowPlot(object = Tcell_data_object,
-          ndims = dimensions(),
+          ndims = dimensions,
           reduction = reduction)
 
 ##### Still using pcs = 20 #####
@@ -1421,7 +1421,7 @@ Tcell_data_object <- FindNeighbors(object = Tcell_data_object,
                                       assay = assay)
 
 ##### clean up #####
-rm(assay, seed, number_of_pcs, reduction, dimensions())
+rm(assay, seed, number_of_pcs, reduction, dimensions)
 gc()
 
 
@@ -1431,13 +1431,13 @@ gc()
 
 ```{r include = TRUE, echo = TRUE}
 
-##### Variables for tsne #####
-
+#USER INPUT NEEDED
 reduction <- "pca"
 assay <- "RNA"
 seed <- 18
 output_reduction_name <- "Tcell_tsne"
 
+#run tSNE
 Tcell_data_object <- RunTSNE(object = Tcell_data_object,
                                 dims = 1:pcs,
                                 reduction = reduction,
@@ -1445,11 +1445,12 @@ Tcell_data_object <- RunTSNE(object = Tcell_data_object,
                                 seed.use = seed,
                                 reduction.name = output_reduction_name)
 
-#generating tsne plots
+#USER INPUT NEEDED
 reduction <- "Tcell_tsne"
 groupings <- list("orig.ident", "Phase")
 dimensions <- 1:2 #standard
 
+#plotting
 plot_list <- list()
 i <- 1
 for (group in groupings) {
@@ -1481,14 +1482,14 @@ gc()
         
 ```{r include = TRUE, echo = TRUE}
 
-##### variables for running UMAP #####
+#USER INPUT NEEDED
 pcs <- 20
 reduction <- "pca"
 number_of_neighbors <- 30
 seed <- 18
 umap_name <- "Tcell_umap"
 
-
+#Run UMAP
 Tcell_data_object <- RunUMAP(object = Tcell_data_object,
                                 dims = 1:pcs,
                                 reduction = reduction,
@@ -1496,6 +1497,7 @@ Tcell_data_object <- RunUMAP(object = Tcell_data_object,
                                 n.neighbors = number_of_neighbors,
                                 seed.use = seed,
                                 reduction.name = umap_name)
+
 #generating UMAP plots
 reduction <- "Tcell_umap"
 grouping <- list("orig.ident", "Phase", "Phase")
@@ -1518,7 +1520,6 @@ for (i in 1:length(plot_list)) {
 }
 
 ##### cleanup #####
-
 rm(reduction, number_of_neighbors, seed, umap_name, grouping, splitting, dimensions, umap_index, plot_list, plot, i)
 gc()
 
@@ -1533,7 +1534,7 @@ gc()
         0.075 used moving forward. Gives us 4 clusters to work with again.
 ```{r include = TRUE, echo = TRUE}
 
-##### FindNeighbors and FindClusters variables: #####
+#USER INPUT NEEDED (1/2)
 reduction <- "pca"
 assay <- "RNA"
 
@@ -1541,8 +1542,7 @@ resolutions_to_test <-c(0.05, 0.075, 0.1, 0.15, 0.2, 0.3)
 seed <- 18
 algo.num <- 1 #original Louvain algorithm
 
-###### Reduction needed for plotting #####
-reduction <- "Tcell_umap"
+
 
 #####################
 #####Clustering#####
@@ -1559,7 +1559,8 @@ Tcell_data_object <- FindClusters(object = Tcell_data_object,
                                      algorithm = algo.num,
                                      random.seed = seed)
 
-
+###### Reduction needed for plotting #####
+reduction <- "Tcell_umap"
 
 #Plotting clustering results
 plot_list <- list()
@@ -1579,6 +1580,7 @@ for (i in 1:length(plot_list)) {
   print(plot_list[[i]])
 }
 
+#USER INPUT NEEDED(2/2)
 #set active ident to correct resolution
 Idents(object = Tcell_data_object) <- "RNA_snn_res.0.075"
 
@@ -1593,7 +1595,7 @@ gc()
         Looks good
 ```{r include = TRUE, echo = TRUE}
 
-##### VARIABLES ######
+#USER INPUT NEEDED (1/1)
 
 dimensions <- 1:2 #standard
 reduction <- "Tcell_umap"
@@ -1684,6 +1686,7 @@ gc()
 ##   Identify Naive T cell cluster based on Lef1 and Tcf7 expression.
 
 ```{r include = TRUE, echo = TRUE}
+#USER INPUT NEEDED (1/1)
 reduction <- "Tcell_umap"
 genes <- c("Lef1", "Tcf7")
 groups <- "genotype"
@@ -1691,15 +1694,19 @@ groups <- "genotype"
 
 FeaturePlot(object = Tcell_data_object,
             reduction = reduction,
-            features = "Lef1",
+            features = genes[1],
             split.by = groups,
             order = FALSE) + theme(legend.position = c(0.8,0.9))
 
 FeaturePlot(object = Tcell_data_object,
             reduction = reduction,
-            features = "Tcf7",
+            features = genes[2],
             split.by = groups,
             order = FALSE) + theme(legend.position = c(0.8,0.9))
+
+
+rm(reduction, genes, groups)
+gc()
 
 ```
 
@@ -1830,35 +1837,50 @@ rm(supp5a_list)
           GSEA of hallmark pathways on clusters 1 and 3
 
 ```{r moduel score}
+#USER INPUT NEEDED (1/1)
+assay <- "RNA"
+log_threshold <- 0.25
+test <- "wilcox"
+layer <- "scale.data"
+min.pct <- 0.25
+
 
 allMarkers <- FindAllMarkers(object = Tcell_data_object,
-                             assay = "RNA",
-                             logfc.threshold = 0.25,
-                             test.use = "wilcox",
+                             assay = assay,
+                             logfc.threshold = log_threshold,
+                             test.use = test,
                              only.pos = FALSE,
                              verbose = TRUE,
-                             layer = 'scale.data',
-                             min.pct = 0.25)
+                             layer = layer,
+                             min.pct = min.pct)
 
 #GSEA for cluster 1
 cluster1_data <- allMarkers[allMarkers$cluster == "1",] 
 
 #rank by log2FC
-cluster1_ranks <- data.frame(gene = cluster1_data$gene, log2FC = cluster1_data$avg_log2FC)
+cluster1_ranks <- data.frame(gene = cluster1_data$gene,
+                             log2FC = cluster1_data$avg_log2FC)
+
 #cluster1_ranks <- cluster1_ranks[order(cluster1_ranks$log2FC, decreasing = TRUE), ]
 ranks_1 <- cluster1_ranks$log2FC
 names(ranks_1) <- cluster1_ranks$gene
 
-cluster1_fgsea_results <- fgsea(pathways = gmt_hallmark_list, stats = ranks_1, minSize = 15, maxSize = 500)
-
+cluster1_fgsea_results <- fgsea(pathways = gmt_hallmark_list,
+                                stats = ranks_1,
+                                minSize = 15,
+                                maxSize = 500)
 
 #Cluster 3
 cluster3_data <- allMarkers[allMarkers$cluster == "3",] 
-cluster3_ranks <- data.frame(gene = cluster3_data$gene, log2FC = cluster3_data$avg_log2FC)
+cluster3_ranks <- data.frame(gene = cluster3_data$gene,
+                             log2FC = cluster3_data$avg_log2FC)
 ranks_3 <- cluster3_ranks$log2FC
 names(ranks_3) <- cluster3_ranks$gene
 
-cluster3_fgsea_results <- fgsea(pathways = gmt_hallmark_list, stats = ranks_3, minSize = 15, maxSize = 500)
+cluster3_fgsea_results <- fgsea(pathways = gmt_hallmark_list,
+                                stats = ranks_3,
+                                minSize = 15,
+                                maxSize = 500)
 
 #extract pathway and NES from GSEA results
 df_list <- list()
@@ -1906,11 +1928,19 @@ rm(name, ranks_1, ranks_3)
 #Get Myc targets and combine
 Mm.h_entrez <- readRDS(file= paste0(MSigDB_directory, "Mm.h.all.v7.1.entrez.rds"))
 
-Hallmark_Myc_targets_v1 <- mapIds(org.Mm.eg.db, Mm.h_entrez$HALLMARK_MYC_TARGETS_V1, 'SYMBOL', 'ENTREZID')
-Hallmark_Myc_targets_v2 <- mapIds(org.Mm.eg.db, Mm.h_entrez$HALLMARK_MYC_TARGETS_V2, 'SYMBOL', 'ENTREZID')
+Hallmark_Myc_targets_v1 <- mapIds(org.Mm.eg.db,
+                                  Mm.h_entrez$HALLMARK_MYC_TARGETS_V1,
+                                  'SYMBOL',
+                                  'ENTREZID')
+Hallmark_Myc_targets_v2 <- mapIds(org.Mm.eg.db,
+                                  Mm.h_entrez$HALLMARK_MYC_TARGETS_V2,
+                                  'SYMBOL',
+                                  'ENTREZID')
 myc_combined <- c(Hallmark_Myc_targets_v1, Hallmark_Myc_targets_v2)
   
-Tcell_data_object <- AddModuleScore(Tcell_data_object, features = list(myc_combined), name = 'myc_combined')
+Tcell_data_object <- AddModuleScore(Tcell_data_object,
+                                    features = list(myc_combined),
+                                    name = 'myc_combined')
 
 Tcell_data_object@meta.data$myc_combined <- Tcell_data_object@meta.data$myc_combined1
 Tcell_data_object@meta.data$myc_combined1 <- NULL
@@ -1918,21 +1948,28 @@ Tcell_data_object@meta.data$myc_combined1 <- NULL
 
 
 
-#plotting data
+#USER INPUT NEEDED
 scored_list <- "myc_combined"
 grouping <- "seurat_clusters"
 colors <- c("black","#66FF99","tan","#0066CC")
+x_lab <- "cluster"
+y_lab <- "Module Score"
+title <-  ""
 
 
 VlnPlot(Tcell_data_object,
-            features = "myc_combined",
+            features = scored_list,
             group.by = grouping,
             pt.size = 0,
             y.max = 0.85,
             cols = colors
             ) +
-              labs(x = "cluster", y = "Module Score", title = "") +
-              geom_hline(yintercept = c(0.2, 0.4, 0.6, 0.8), linetype = "dashed", color = "gray50")
+              labs(x = x_lab,
+                   y = y_lab,
+                   title = title) +
+              geom_hline(yintercept = c(0.2, 0.4, 0.6, 0.8),
+                         linetype = "dashed",
+                         color = "gray50")
 
 rm(scored_list, grouping, colors)
 rm(Hallmark_Myc_targets_v1, Hallmark_Myc_targets_v2, myc_combined)
@@ -1976,19 +2013,25 @@ counts <- Tcell_data_object@assays$RNA$counts
 barcodes <- colnames(counts)
 gene_names <- rownames(counts)
 
+matrix_file <- "matrix.mtx"
+barcodes_file <- "barcodes.tsv"
+genes_file <- "genes.tsv"
 
 
 # Output counts matrix
-writeMM(counts, paste0(filtered_dir, 'matrix.mtx'))
+writeMM(counts, paste0(filtered_dir,
+                       matrix_file))
 
 # Output cell barcodes
-write.table(as.data.frame(barcodes), paste0(filtered_dir, 'barcodes.tsv'),
+write.table(as.data.frame(barcodes), paste0(filtered_dir, barcodes_file),
            col.names = FALSE, row.names = FALSE, sep = "\t")
 
 # Output feature names
 features <- data.frame("gene_id" = gene_names,"gene_name" = gene_names,type = "Gene Expression")
-write.table(as.data.frame(features), sep = "\t", paste0(filtered_dir, 'genes.tsv'),
+write.table(as.data.frame(features), sep = "\t", paste0(filtered_dir, genes_file),
            col.names = FALSE, row.names = FALSE)
+
+rm()
 
 ```
 
