@@ -1,5 +1,5 @@
 # Opa1-scRNAseq
-scRNAseq analysis included in Willett et al. 2025 (Accepted at Cell Reports, publication data: TBD)
+scRNAseq analysis included in Willett et al. (2025) Mitochondrial protein OPA1 is required for the expansion of effector CD8 T cells. Cell Reports. DOI: 10.1016/j.celrep.2025.115610
 
 Experimental details:
 WT and Opa1-/- OT1 CD8 T cells
